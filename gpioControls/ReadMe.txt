@@ -1,8 +1,8 @@
 The sripts in this directory monitor the RPI2's gpio pins for an event.
 They need to be started in the background during startup by including the lines:
 
-sudo nohup ./home/pi/Desktop/NavioTesting/gpioControls/gpio16.sh &>/dev/null &
-sudo nohup ./home/pi/Desktop/NavioTesting/gpioControls/gpio12.sh &>/dev/null &
+sudo nohup /home/pi/Desktop/AVCControls/gpioControls/gpio16.sh &>/dev/null &
+sudo nohup /home/pi/Desktop/AVCControls/gpioControls/gpio12.sh &>/dev/null &
 
 in the folder /etc/rc.local. 
 'nohup' allows the program to continue after the shell ends and sends a HangUP command.
