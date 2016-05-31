@@ -1,36 +1,27 @@
 """
-MS5611 driver code is placed under the BSD license.
-Copyright (c) 2014, Emlid Limited, www.emlid.com
-All rights reserved.
+Robotritons troubleshooting version for magnetometer navigation.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-	* Redistributions of source code must retain the above copyright
-	notice, this list of conditions and the following disclaimer.
-	* Redistributions in binary form must reproduce the above copyright
-	notice, this list of conditions and the following disclaimer in the
-	documentation and/or other materials provided with the distribution.
-	* Neither the name of the Emlid Limited nor the names of its contributors
-	may be used to endorse or promote products derived from this software
-	without specific prior written permission.
+Purpose: Use a magnetometer to calculate the vehicle's cardinal heading.
+Requirements: An InvenSense MPU-9250. The python modules spidev, time, math, navio.util, and navio.mpu9250
+Use: Instantiate an imu object, initialize it, then call the read_mag() method to update the list of magnetometer_data.
+	The angle of north, with reference from the front of the vehicle, is then calculated.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL EMLID LIMITED BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+Updates:
+- May 30, 2016. At unknown conditions, the magnetometer will start outputting all zeros.
+
+Resources:
+https://docs.emlid.com/navio/Navio-dev/read-gps-data/
+https://shahriar.svbtle.com/importing-star-in-python
 """
 
 import spidev
 import time
 import math
+import navio.util
 
 from navio.mpu9250 import MPU9250
+
+navio.util.check_apm()
 
 imu = MPU9250()
 print "Connection established: ", imu.testConnection()
@@ -41,27 +32,29 @@ time.sleep(1)
 
 while True:
 	imu.read_mag()
+	
+	#Prepare variables
 	if (imu.magnetometer_data[0] == 0):
 		x = (imu.magnetometer_data[1]/(0.001))
 	else:
 		x = (imu.magnetometer_data[1]/imu.magnetometer_data[0])
-
 	radians = math.acos(x)
-        theta = math.degrees(radians)
-
-        if ((imu.magnetometer_data[0] < 0) and (imu.magnetometer_data[1] < 0)):
-                angle = theta + 180
-        elif ((imu.magnetometer_data[0] < 0) and (imu.magnetometer_data[1] > 0)):
-                angle = theta + 180
-        elif ((imu.magnetometer_data[0] > 0) and (imu.magnetometer_data[1] < 0)):
-                angle = theta + 360
-        else:
-                angle = theta + 0
-        # print "Accelerometer: ", imu.accelerometer_data
-        # print "Gyroscope:     ", imu.gyroscope_data
-        # print "Temperature:   ", imu.temperature
-        print "Magnetometer:  ", imu.magnetometer_data
-        print "Angle in degrees: ", angle
+    theta = math.degrees(radians)
+	
+	#Convert coordinates from cartesian to polar
+    if ((imu.magnetometer_data[0] < 0) and (imu.magnetometer_data[1] < 0)):
+		angle = theta + 180
+    elif ((imu.magnetometer_data[0] < 0) and (imu.magnetometer_data[1] > 0)):
+		angle = theta + 180
+    elif ((imu.magnetometer_data[0] > 0) and (imu.magnetometer_data[1] < 0)):
+		angle = theta + 360
+    else:
+		angle = theta + 0
+	# print "Accelerometer: ", imu.accelerometer_data
+	# print "Gyroscope:     ", imu.gyroscope_data
+	# print "Temperature:   ", imu.temperature
+	print "Magnetometer:  ", imu.magnetometer_data
+	print "Angle in degrees: ", angle
 	print "Corrected angle in degrees: ", theta
 
 	time.sleep(0.5)
