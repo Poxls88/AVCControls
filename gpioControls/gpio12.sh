@@ -10,7 +10,14 @@
 #
 #Resources:
 #https://learn.sparkfun.com/tutorials/switch-basics
+#http://stackoverflow.com/questions/4906579/how-to-use-bash-to-create-a-folder-if-it-doesnt-already-exist
+#http://stackoverflow.com/questions/408975/compare-integer-in-bash-unary-operator-expected
+#
 #http://ryanstutorials.net/bash-scripting-tutorial/bash-if-statements.php
+#http://stackoverflow.com/questions/2188199/how-to-use-double-or-single-bracket-parentheses-curly-braces
+#http://stackoverflow.com/questions/4468824/command-not-found-when-attempting-integer-equality-in-bash
+#
+#
 
 # export GPIO pin 12 and set as an input with pull-up
 if [ ! -d /sys/class/gpio/gpio12 ]
@@ -32,7 +39,7 @@ do
 #echo "now" $now
 
 # monitor GPIO pin 16 to go low.
-if [ "$(cat /sys/class/gpio/gpio16/value)" == '0' ]
+if [ "$(cat /sys/class/gpio/gpio12/value)" == '0' ]
 then
  lastT=$pressT
  pressT=$(date +%s) #Update time of most recent button press
@@ -43,11 +50,11 @@ then
 fi
 
 #Shutdown if the button was pressed in quick succession between 1 and 3 seconds.
-if [$dur -gt 1] && [$dur -lt 4]
+if [ "$dur" -gt 1 ] && [ "$dur" -lt 4 ]
 then
+ echo "System will shutdown"
  sudo shutdown -hP now
  exit 0
 fi
-
 sleep 0.5
-Done
+done
