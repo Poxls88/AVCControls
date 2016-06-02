@@ -60,31 +60,31 @@ while True:
 	#	Note: all calculations assume x is the verticle axis and y is horizontal
 	imu.read_mag()
 	
-	#Fit readings into a unit paralellogram with appropriate x and y bounds...
-	xVal = imu.magnetometer_data[0]/unit[0]
-	yVal = imu.magnetometer_data[1]/unit[1]
-	#Map the paralellogram to a unit circle
-	xCircle = xVal * sqrt(1 - 0.5*(yVal^2))
-	yCircle = yVal * sqrt(1 - 0.5*(xVal^2))
+	#Scale readings into a unit square relative to their maximum...
+	xVal = min((imu.magnetometer_data[0]/unit[0]),unit[0])
+	yVal = min((imu.magnetometer_data[1]/unit[1]),unit[1])
+	#Map the square to a unit circle
+	xCircle = float(xVal * sqrt(1 - 0.5*(yVal^2)))
+	yCircle = float( * sqrt(1 - 0.5*(xVal^2)))
+	#Normalize the coordinates so that they are essentially on the edge of a unit circle
+	mag = float(sqrt((xCircle^2) + (yCircle^2)))
+	xNorm = xCircle/mag
+	yNorm = yCircle/mag
 	
 	#Convert placement on the unit circle to an angle
-	radians = math.acos(xCircle)#Although y is our horizontal, we compute arccosine of x to get an angle relative to forward
+	radians = math.acos(xNorm)#Although y is our horizontal, we compute arccosine of x to get an angle relative to forwards
     theta = math.degrees(radians)
 	
 	#Convert arccos domain to full circle
-	if (xCircle < 0) and (yCircle < 0)):
-		angle = theta + 180
-	elif (xCircle < 0) and (yCircle > 0)):
-		angle = theta + 180
-	elif (xCircle > 0) and (yCircle < 0)):
-		angle = theta + 360
+	if (yCircle > 0): #If reading is right of forwards
+		angle = theta + 180 #Then our arccos is really on the other side of the circle
 	else:
-		angle = theta + 0
+		angle = theta + 0 #Then our arccos is on the left of the circle and 0-180 relative to forwards
 	# print "Accelerometer: ", imu.accelerometer_data
 	# print "Gyroscope:     ", imu.gyroscope_data
 	# print "Temperature:   ", imu.temperature
 	print "Magnetometer:  ", imu.magnetometer_data
-	print "Angle in degrees: ", angle
-	print "Corrected angle in degrees: ", theta
+	print "Arccos in degrees: ", theta
+	print "Corrected angle in degrees: ", angle
 
 	time.sleep(0.5)
