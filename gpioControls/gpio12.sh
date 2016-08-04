@@ -29,9 +29,8 @@ echo "in" > /sys/class/gpio/gpio12/direction
 echo "high" > /sys/class/gpio/gpio12/direction
 
 # Prepare timer
-lastT=0
 pressT=0
-dur=1
+count=0
 
 while [ true ]
 do
@@ -39,18 +38,16 @@ do
 #echo "now" $now
 
 # monitor GPIO pin 16 to go low.
-if [ "$(cat /sys/class/gpio/gpio12/value)" == '0' ]
+if [ "$(cat /sys/class/gpio/gpio12/value)" == '1' ]
 then
- lastT=$pressT
  pressT=$(date +%s) #Update time of most recent button press
- dur=$((pressT - lastT)) #Calculate time between pressed buttons
- #echo "last" $lastT
- #echo "press" $pressT
- #echo "dur" $dur
+ count=$((count + 1))
+ echo "press" $pressT
+ echo "count" $count
 fi
 
-#Shutdown if the button was pressed in quick succession between 1 and 3 seconds.
-if [ "$dur" -gt 1 ] && [ "$dur" -lt 4 ]
+#Shutdown if the original rocker is pushed to OFF for 3 counts thus 1 second
+if [ "$count" -gt 2 ]
 then
  echo "System will shutdown"
  sudo shutdown -hP now

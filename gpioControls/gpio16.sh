@@ -5,7 +5,7 @@
 #Requirements: Bash, a startup script such as /etc/rc.local to execute this file in the background, available GPIO12 pin.
 #Use: Any momentary NormallyOpen switch like a single pull, single throw button should be connected to GPIO12 and ground.
 # A line must be added in a startup script to execute the program as a background daemon. For example,
-#	sudo nohup /home/pi/Desktop/AVCControls/gpioControls/gpio12.sh &>/dev/null &
+#	sudo nohup /home/pi/Desktop/AVCControls/gpioControls/gpio16.sh &>/dev/null &
 # Then click the button twice within any 2 second interval. The RPI2 will then shutdown.
 #
 #Resources:
@@ -29,31 +29,28 @@ echo "in" > /sys/class/gpio/gpio16/direction
 echo "high" > /sys/class/gpio/gpio16/direction
 
 # Prepare timer
-lastT=0
 pressT=0
-dur=1
+count=0
 
 while [ true ]
 do
 #now=$(date +%s) #Track current time
 #echo "now" $now
 
-# monitor GPIO pin 16 to go low.
-if [ "$(cat /sys/class/gpio/gpio16/value)" == '0' ]
+# monitor GPIO pin 16 to go high.
+if [ "$(cat /sys/class/gpio/gpio16/value)" == '1' ]
 then
- lastT=$pressT
  pressT=$(date +%s) #Update time of most recent button press
- dur=$((pressT - lastT)) #Calculate time between pressed buttons
- #echo "last" $lastT
- #echo "press" $pressT
- #echo "dur" $dur
+ count=$((count + 1))
+ echo "press" $pressT
+ echo "count" $count
 fi
 
-#Shutdown if the button was pressed in quick succession between 1 and 3 seconds.
-if [ "$dur" -gt 1 ] && [ "$dur" -lt 4 ]
+#Shutdown if the rocker is held open for 3 counts thus 1 second.
+if [ "$count" -gt 2 ]
 then
  echo "System will shutdown"
- sudo shutdown -hP now
+ #sudo shutdown -hP now
  exit 0
 fi
 sleep 0.5
