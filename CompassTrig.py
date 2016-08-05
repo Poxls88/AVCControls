@@ -60,7 +60,7 @@ def calibrateCardinalMean():
 		time.sleep(0.5)
 	xNorth = float(sum(xSet))/max(len(xSet),1)
 	yNorth = float(sum(ySet))/max(len(ySet),1)
-	time.sleep(1)
+	time.sleep(2)
 
         print "Place East"
         for x in range(10):
@@ -71,7 +71,7 @@ def calibrateCardinalMean():
                 time.sleep(0.5)
         xEast = float(sum(xSet))/max(len(xSet),1)
         yEast = float(sum(ySet))/max(len(ySet),1)
-	time.sleep(1)
+	time.sleep(2)
 
         print "Place South"
         for x in range(10):
@@ -82,7 +82,7 @@ def calibrateCardinalMean():
                 time.sleep(0.5)
         xSouth = float(sum(xSet))/max(len(xSet),1)
         ySouth = float(sum(ySet))/max(len(ySet),1)
-	time.sleep(1)
+	time.sleep(2)
 
         print "Place West"
         for x in range(10):
@@ -112,24 +112,26 @@ while True:
 	yRaw = imu.magnetometer_data[1] #print >> f, "Y raw, %f" % (imu.magnetometer_data[1])
 	#f.close()
 
-	if (abs(cardinalMean['xN'] - xRaw) < 7 and abs(cardinalMean['yN'] - yRaw) < 7): #If within the error band for north
-		print "NORTH"
-	elif (abs(cardinalMean['xE'] - xRaw) < 7 and abs(cardinalMean['yE'] - yRaw) < 7):
-		print "EAST"
-	elif (abs(cardinalMean['xS'] - xRaw) < 7 and abs(cardinalMean['yS'] - yRaw) < 7):
-		print "SOUTH"
-	elif (abs(cardinalMean['xW'] - xRaw) < 7 and abs(cardinalMean['yW'] - yRaw) < 7):
-		print "WEST"
+	if (abs(xRaw-yRaw) < 15): #If NORTH or EAST (both have similar x/y values)
+		if (yRaw < (cardinalMean['yN']-10)): #Use y. If EAST (usually 10uT less than NORTH)
+			print "EAST"
+		else:
+			print "NORTH"
+	elif (abs(xRaw-yRaw) > 30): #If SOUTH or WEST (both have very different x/y values)
+		if (xRaw < (cardinalMean['xW']-10)): #Use x. If SOUTH (usually 10uT less than WEST)
+			print "SOUTH"
+		else:
+			print "WEST"
 	else: #default to the experimental estimation from August 4, 2016
 		print "Direction?"
-        if (abs(xRaw - yRaw) <= 10): #If cardinal direction is NORTH or EAST
-                if ((xRaw>10) and (yRaw>10)):
-                        print "NORTH"
-                else:
-                        print "EAST"
-        else:#Cardinal direction is WEST or SOUTH
-                if ((xRaw<-10) and (yRaw>10)):
-                        print "SOUTH"
-                else:
-                        print "WEST"
+		if (abs(xRaw - yRaw) <= 10): #If cardinal direction is NORTH or EAST
+                	if ((xRaw>10) and (yRaw>10)):
+                        	print "NORTH"
+                	else:
+                        	print "EAST"
+        	else:#Cardinal direction is WEST or SOUTH
+                	if ((xRaw<-10) and (yRaw>10)):
+                        	print "SOUTH"
+                	else:
+                        	print "WEST"
 	time.sleep(0.5)
