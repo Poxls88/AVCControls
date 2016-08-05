@@ -112,8 +112,17 @@ while True:
 	yRaw = imu.magnetometer_data[1] #print >> f, "Y raw, %f" % (imu.magnetometer_data[1])
 	#f.close()
 
-        #If cardinal direction is NORTH or EAST (by experimentation August 4, 2016)
-        if (abs(xRaw - yRaw) <= 10):
+	if (abs(cardinalMean['xN'] - xRaw) < 7 and abs(cardinalMean['yN'] - yRaw) < 7): #If within the error band for north
+		print "NORTH"
+	elif (abs(cardinalMean['xE'] - xRaw) < 7 and abs(cardinalMean['yE'] - yRaw) < 7):
+		print "EAST"
+	elif (abs(cardinalMean['xS'] - xRaw) < 7 and abs(cardinalMean['yS'] - yRaw) < 7):
+		print "SOUTH"
+	elif (abs(cardinalMean['xW'] - xRaw) < 7 and abs(cardinalMean['yW'] - yRaw) < 7):
+		print "WEST"
+	else: #default to the experimental estimation from August 4, 2016
+		print "Direction?"
+        if (abs(xRaw - yRaw) <= 10): #If cardinal direction is NORTH or EAST
                 if ((xRaw>10) and (yRaw>10)):
                         print "NORTH"
                 else:
