@@ -7,6 +7,12 @@ Use: Place the vehicle facing north. Instantiate an imu object, initialize it, t
 	The angle of north, with reference from the front of the vehicle, is then calculated.
 
 Updates:
+- August 4, 2016. Temporarily created CompassCheck.py in order to output raw magnometer readings to a CSV file, I then graphed those on my computer to look for
+	patterns for each cardinal direction. From my findings, I have updated this CompassTrig.py script to output the cardinal direction of the vehicle's head.
+	The calibrateUnit() function was also replaced with calibrateCardinalMean() which finds current magnetometer readings for the cardinal directions.
+	My findings from CompassCheck.py were that our initial impression was wrong and the magnometer's x/y data do not have a simple relation on an x-y plot, so trig functions
+	do not help. Instead, the x/y data raw values are fairly predictable and lie within different bands for each cardinal direction. A simple conditional
+	check of x/y reveals the current band and by extension, cardinal direction N,S,E,W.
 - June 5, 2016. Created "navio/mpu9250_better" and probably stopped magnetometer from returning all zeros after a couple of program restarts. I made this band-aid
 	solution following the progress of the Emlid Developers linked to under "Resources Bugs". The root of the problem is an I2C interruption leading to a
 	device unknown state. So far I have restarted the CompassTrig.py several times while it includes mpu9250_better and the magnetometer hasn't produced all zeros. 
@@ -42,66 +48,79 @@ imu.initialize()
 time.sleep(1)
 
 
-def calibrateUnit():
+def calibrateCardinalMean():
 	xSet = []
 	ySet = []
+	print "Place North"
 	for x in range(10):
 		imu.read_mag()
 		xSet.append(imu.magnetometer_data[0])
-		print xSet #
-		time.sleep(0.5)
-	xMean = float(sum(xSet))/max(len(xSet),1)
-	print "now Y"
-	time.sleep(5)
-	for x in range(10):
-		imu.read_mag()
 		ySet.append(imu.magnetometer_data[1])
-		print ySet #
+		#print xSet
 		time.sleep(0.5)
-	yMean = float(sum(ySet))/max(len(ySet),1)
-	Unit = [xMean,yMean]
-	print "Unit: ", Unit #
-	return Unit
+	xNorth = float(sum(xSet))/max(len(xSet),1)
+	yNorth = float(sum(ySet))/max(len(ySet),1)
+	time.sleep(1)
 
-#Prepare variables
-#Any trig needs to be performed on a unit circle
-unit = calibrateUnit()
+        print "Place East"
+        for x in range(10):
+                imu.read_mag()
+                xSet.append(imu.magnetometer_data[0])
+                ySet.append(imu.magnetometer_data[1])
+                #print xSet
+                time.sleep(0.5)
+        xEast = float(sum(xSet))/max(len(xSet),1)
+        yEast = float(sum(ySet))/max(len(ySet),1)
+	time.sleep(1)
+
+        print "Place South"
+        for x in range(10):
+                imu.read_mag()
+                xSet.append(imu.magnetometer_data[0])
+                ySet.append(imu.magnetometer_data[1])
+                #print xSet
+                time.sleep(0.5)
+        xSouth = float(sum(xSet))/max(len(xSet),1)
+        ySouth = float(sum(ySet))/max(len(ySet),1)
+	time.sleep(1)
+
+        print "Place West"
+        for x in range(10):
+                imu.read_mag()
+                xSet.append(imu.magnetometer_data[0])
+                ySet.append(imu.magnetometer_data[1])
+                #print xSet
+                time.sleep(0.5)
+        xWest = float(sum(xSet))/max(len(xSet),1)
+        yWest = float(sum(ySet))/max(len(ySet),1)
+	cardinalMean = {'xN':xNorth, 'yN':yNorth, 'xE':xEast, 'yE':yEast, 'xS':xSouth, 'yS':ySouth, 'xW':xWest, 'yW':yWest}
+	time.sleep(0.5)
+	return cardinalMean
+
+#Calculate our average direction values
+cardinalMean = calibrateCardinalMean()
 
 while True:
 	#Read our magnetometer
 	#	Note: The magnetometer data is stored as a list ordered [x,y,z]
 	#	Note: x+ is directed towards the front of the RPI2/Navio+ and y+ is directed towards the right of the RPI2/Navio+
-	#	Note: all calculations assume x is the verticle axis and y is horizontal
+	#	Note: all calculations assume x is the verticle axis and y is horizontal. Upsidedown vehicle reverses E<->W
 	imu.read_mag()
-	
-	#Scale readings into a unit square relative to their maximum...
-	xVal = min((imu.magnetometer_data[0]/unit[0]),unit[0])
-	yVal = min((imu.magnetometer_data[1]/unit[1]),unit[1])
-	#Map the square to a unit circle
-	print "X raw: %f \n scaled: %f" % (imu.magnetometer_data[0],xVal)
-	print "Y raw: %f \n scaled: %f" % (imu.magnetometer_data[1],yVal)
-	'''
-	xCircle = float(xVal * math.sqrt(1 - 0.5*(math.pow(yVal,2))))
-	yCircle = float(yVal * math.sqrt(1 - 0.5*(math.pow(xVal,2))))
-	#Normalize the coordinates so that they are essentially on the edge of a unit circle
-	mag = float(math.sqrt((math.pow(xCircle,2)) + (math.pow(yCircle,2))))
-	xNorm = xCircle/mag
-	yNorm = yCircle/mag
-	
-	#Convert placement on the unit circle to an angle
-	radians = math.acos(xNorm)#Although y is our horizontal, we compute arccosine of x to get an angle relative to forwards
-	theta = math.degrees(radians)
-	
-	#Convert arccos domain to full circle
-	if (yCircle > 0): #If reading is right of forwards
-		angle = theta + 180 #Then our arccos is really on the other side of the circle
-	else:
-		angle = theta + 0 #Then our arccos is on the left of the circle and 0-180 relative to forwards
-	# print "Accelerometer: ", imu.accelerometer_data
-	# print "Gyroscope:     ", imu.gyroscope_data
-	# print "Temperature:   ", imu.temperature
-	print "Magnetometer:  ", imu.magnetometer_data
-	print "Arccos in degrees: ", theta
-	print "Corrected angle in degrees: ", angle
-	'''
+
+	#f = open('CompassCapt.txt', 'w')
+	xRaw = imu.magnetometer_data[0] #print >> f, "X raw, %f" % (imu.magnetometer_data[0])
+	yRaw = imu.magnetometer_data[1] #print >> f, "Y raw, %f" % (imu.magnetometer_data[1])
+	#f.close()
+
+        #If cardinal direction is NORTH or EAST (by experimentation August 4, 2016)
+        if (abs(xRaw - yRaw) <= 10):
+                if ((xRaw>10) and (yRaw>10)):
+                        print "NORTH"
+                else:
+                        print "EAST"
+        else:#Cardinal direction is WEST or SOUTH
+                if ((xRaw<-10) and (yRaw>10)):
+                        print "SOUTH"
+                else:
+                        print "WEST"
 	time.sleep(0.5)

@@ -12,8 +12,9 @@ in the folder /etc/rc.local.
 
 Use:
 gpio12.sh will monitor the RPI2 GPIO-12 pin which is connected to the
-Navio+'s AUX signal pin. It's use is to start a python autonomous program.
+Navio+'s AUX signal pin. It's use is to properly shutdown the RPI2 by
+turning "OFF" the original rocker switch.
 
 gpio16.sh will monitor the RPI2 GPIO-16 pin which is connected to the
-soldered wires on the bottom of the RPI2. It's use is to properly shutdown
-the RPI2 by a pushbutton event.
+soldered wires on the bottom of the RPI2. It's use is to start a python
+autonomous program.
