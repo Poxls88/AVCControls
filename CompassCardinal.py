@@ -4,7 +4,7 @@ Robotritons troubleshooting version for magnetometer navigation.
 Purpose: Use a magnetometer to calculate the vehicle's cardinal heading.
 Requirements: An InvenSense MPU-9250. The python modules spidev, time, math, navio.util, and navio.mpu9250
 Use: Place the vehicle facing north. Instantiate an imu object, initialize it, then call the read_mag() method to update the list of magnetometer_data.
-	The angle of north, with reference from the front of the vehicle, is then calculated.
+	The direction of the front of the vehicle will be calculated.
 
 Updates:
 - August 4, 2016. Temporarily created CompassCheck.py in order to output raw magnometer readings to a CSV file, I then graphed those on my computer to look for
