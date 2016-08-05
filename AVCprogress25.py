@@ -43,7 +43,7 @@ time.sleep(1)
 vehicle_servo = VehiclePWMModule.vehiclePWM("servo")
 vehicle_esc = VehiclePWMModule.vehiclePWM("esc")
 #initialize desired direction
-desDir = 1 #0=N, 1=E, 2=S, 3=W
+desDir = 0 #0=N, 1=E, 2=S, 3=W
 curDir = 0
 
 def calibrateCardinalMean():
@@ -155,7 +155,10 @@ while True:
 				else:
 					vehicle_servo.steer(120)
 			time.sleep(0.5)
+			vehicle_esc.accel(1)
+
 		else: #Stay centered
+			vehicle_esc.stop()
 			vehicle_servo.center()
 			time.sleep(0.5)
 

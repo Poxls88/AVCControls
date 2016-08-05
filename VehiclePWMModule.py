@@ -93,7 +93,7 @@ class vehiclePWM:
 		self.Motor_Range = 100.0 #Define motor max speed
 # ---- End PWM Constants ----
 
-"""
+	"""
 		A 12bit digital I2C signal controls the PCA9685 which then prepares an
 		analog PWM wave for the Savox SC-1258TG servo.
 		The PWM signal's absolute width directly controls the servo's angle.
@@ -102,7 +102,7 @@ class vehiclePWM:
 		with respect to the operating frequency. The specific relation:
 
 			12BitWritten = 12BitRange * (DesiredSignalWidth * OperatingFrequency)
-"""
+	"""
 # ---- Servo Outputs ----
 	def steer(self, deg):
 		"""
