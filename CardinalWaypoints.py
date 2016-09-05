@@ -112,13 +112,13 @@ def NAVposllhUpdate():
 	#Grab the current gps location
 	pos = ubl.GPSfetch()
 	print pos, '\n'
-	print pos['hAcc'], '\n'
+	#print pos['hAcc'], '\n'
 
 vehicle_esc.stop()
 vehicle_esc.rest()
 vehicle_servo.center()
-GPSNavInit()
-GPSaccAdjust():
+#GPSNavInit()
+#GPSaccAdjust():
 	
 while(True):
 	try:

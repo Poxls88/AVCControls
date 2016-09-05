@@ -143,6 +143,7 @@ class U_blox:
 		
 		#If the buffer held a NAVposllh message
 		if((curr_mess.msg_class  == 0x01) & (curr_mess.msg_id == 0x02)):
+			print "NAVposllh message"
 			msg = NavPosllhMsg()
 			curr_values = struct.unpack("<IiiiiII", str(bytearray(curr_mess.msg_payload)))
 			msg.itow = curr_values[0]#Assign the current values into the msg object's parameters
@@ -157,6 +158,7 @@ class U_blox:
 		
 		#If the buffer held a NAVstatus message
 		if((curr_mess.msg_class == 0x01) & (curr_mess.msg_id == 0x03)):
+			print "NAVstatus message"
 			msg = NavStatusMsg()
 			msg.fixStatus = curr_mess.msg_payload[4]
 			msg.fixOk = curr_mess.msg_payload[5]
@@ -178,9 +180,13 @@ class U_blox:
 		if (args):
 			return self.fetchSpecial()
 		buffer = self.bus.xfer2([100])
+		#print buffer
+		#yes there is stuff in the buffer, but self.scan_ubx(byt) is never returning a valid message after NavStatus sucesfully runs
+		#This problem only happens if you put in a time.sleep() while scanning, even a 0.1 second sleep screws it up.
 		for byt in buffer:
 			self.scan_ubx(byt)
 			if(self.mess_queue.empty() != True):
+				#print "message"
 				data = self.parse_ubx()
 				if (data != None):
 					if(self.debug == True):
