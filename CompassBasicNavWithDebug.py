@@ -2,12 +2,14 @@
 Robotritons testing version of compass navigation.
 
 Purpose: Use a magnetometer to reliably steer the vehicle.
-Requirements: An InvenSense MPU-9250. The python modules spidev, time, math, navio.util, and navio.mpu9250
+Requirements: An InvenSense MPU-9250. The python modules logging, sys, spidev, time, math, navio.util, and navio.mpu9250
 Use: Place the vehicle facing north. Instantiate an imu object, then initialize it, then calibrate N,E,S,W, finally call the read_mag() method to update the list of magnetometer_data
 	and calculate the current direction.
 	Input a desired direction and the vehicle will try to turn itself that way.
 
 Updates:
+- September 7, 2016. Replaced print statements with output from the logging library. root_log prints to the console, data_log formats csv and prints to a file.
+
 - September 5, 2016. Heading now measurable in degrees by incorporating arctan and declenation formulas based on adafruits datasheet. Also incorporated steering towards a degree direction.
 
 - August 5, 2016. Created the file.
@@ -17,6 +19,8 @@ https://docs.emlid.com/navio/Navio-dev/mpu9250-imu/
 https://store.invensense.com/datasheets/invensense/MPU9250REV1.0.pdf
 https://shahriar.svbtle.com/importing-star-in-python
 http://stackoverflow.com/questions/1621831/how-can-i-convert-coordinates-on-a-square-to-coordinates-on-a-circle
+
+Resources Logging:
 
 Resources Headings:
 https://cdn-shop.adafruit.com/datasheets/AN203_Compass_Heading_Using_Magnetometers.pdf
@@ -53,14 +57,44 @@ https://github.com/ArduPilot/ardupilot/pull/2504 #Someone else did it their own 
 
 """
 
+import logging
 import sys
 import spidev
 import time
 import math
 import navio.util
 
+
 from navio.mpu9250_better import MPU9250
 import VehiclePWMModule
+
+# ----- Setup Logging -----
+#1) Loggers create log records. They are the outermost interface included in appliation code. root logger is default.
+#2) Handlers send the log records to particular desitnations.
+#3) Formatters specify the layout of the final output
+
+#Add a basic console stream handler to the root (parent) logger
+logging.basicConfig(level=logging.INFO)#Change debug level to control console output <----------
+log_root = logging.getLogger('')#Assign an easy name to the root logger
+
+#Create a separate logger for raw data from the magnetometer
+log_mag = logging.getLogger('magnetometer')
+log_mag.setLevel(logging.INFO) #Change debug level to control file output <----------
+
+#Create a handler that outputs to a csv file
+handler_mag = logging.FileHandler('MagnetometerData.csv')
+handler_mag.setLevel(logging.DEBUG) #This handler handles all outputs to the file
+
+#Create a formatter that labels the data
+format_mag = logging.Formatter('%(levelname)-8s,%(message)s')
+
+#Add format to handler, then handler to logger
+handler_mag.setFormatter(format_mag)
+log_mag.addHandler(handler_mag)
+
+#Example in text logging call
+#log_mag.info('This is some data %f', variable)
+# ----- End Log Setup -----
 
 navio.util.check_apm()
 imu = MPU9250()
@@ -83,46 +117,46 @@ curDir = 0
 def calibrateMagNorth():
 	xSet = []
 	ySet = []
-	print "Place North"
+	log_root.info('Place North')
 	time.sleep(2)
 	for x in range(10):
 		imu.read_mag()
 		xSet.append(imu.magnetometer_data[0])
 		ySet.append(imu.magnetometer_data[1])
-		#print xSet
+		log_mag.info('%f,%f' % (xSet,ySet))
 		time.sleep(0.5)
 	xNorth = float(sum(xSet))/max(len(xSet),1)#Mean
 	yNorth = float(sum(ySet))/max(len(ySet),1)
 	
-	print "Place East"
+	log_root.info('Place East')
 	time.sleep(2)
 	for x in range(10):
 		imu.read_mag()
 		xSet.append(imu.magnetometer_data[0])
 		ySet.append(imu.magnetometer_data[1])
-		#print xSet
+		log_mag.info('%f,%f' % (xSet,ySet))
 		time.sleep(0.5)
 	xEast = float(sum(xSet))/max(len(xSet),1)#Mean
 	yEast = float(sum(ySet))/max(len(ySet),1)
 
-	print "Place South"
+	log_root.info('Place South')
 	time.sleep(2)
 	for x in range(10):
 		imu.read_mag()
 		xSet.append(imu.magnetometer_data[0])
 		ySet.append(imu.magnetometer_data[1])
-		#print xSet
+		log_mag.info('%f,%f' % (xSet,ySet))
 		time.sleep(0.5)
 	xSouth = float(sum(xSet))/max(len(xSet),1)#Mean
 	ySouth = float(sum(ySet))/max(len(ySet),1)
 
-	print "Place West"
+	log_root.info('Place West')
 	time.sleep(2)
 	for x in range(10):
 		imu.read_mag()
 		xSet.append(imu.magnetometer_data[0])
 		ySet.append(imu.magnetometer_data[1])
-		#print xSet
+		log_mag.info('%f,%f' % (xSet,ySet))
 		time.sleep(0.5)
 	xWest = float(sum(xSet))/max(len(xSet),1)
 	yWest = float(sum(ySet))/max(len(ySet),1)#Mean
@@ -154,10 +188,9 @@ while True:
 		#	Note: x+ is directed towards the front of the RPI2/Navio+ and y+ is directed towards the right of the RPI2/Navio+
 		#	Note: all calculations assume x is the verticle axis and y is horizontal. Upsidedown vehicle reverses E<->W
 		imu.read_mag()
-		#f = open('CompassCapt.txt', 'w')
 		xRaw = imu.magnetometer_data[0] #print >> f, "X raw, %f" % (imu.magnetometer_data[0])
 		yRaw = imu.magnetometer_data[1] #print >> f, "Y raw, %f" % (imu.magnetometer_data[1])
-		#f.close()
+		log_mag.info('%f,%f' % (xRaw,yRaw))
 		
 		#Translate current reading so that it lies on a circle centered on the origin
 		yCtrd = yRaw-yMean#Current readings minus the mean
@@ -174,16 +207,16 @@ while True:
 		#If the vehicle faces EAST reoprt 270 degrees from north (3/2 pi)
 		headRad = headRadSign%math.pi
 		headDeg = headDegSign%360
-		print 'Radians heading from north: %f \n' % (headRad)
-		print 'Degrees heading from north: %f \n' % (headDeg)
+		log_root.info('Radians heading fron North: %f' % (headRad))
+		log_root.info('Degrees heading fron North: %f' % (headDeg))
 		
 		if (abs(yRaw - yMean) < 1): #If Y is inside a small threshold of its median the vehicle faces NORTH or SOUTH:
 			if (xRaw >= xMean): #If X reads above its median, the vehicle faces NORTH
-				print "NORTH"
+				log_root.info('NORTH')
 			elif (xRaw < xMean): #If X reads below its median, the vehicle faces SOUTH
-				print "SOUTH"
+				log_root.info('SOUTH')
 			else:
-				print "Direction? (N/S)"
+				log_root.info('Direction? N/S')
 			#Otherwise
 			#Y points NORTH and reads above its median, meaning the vehicle faces mostly WEST
 			#Y points SOUTH and reads below its median, meaning the vehicle faces mostly EAST
