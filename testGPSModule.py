@@ -15,6 +15,13 @@ CFGmsg8_NAVposllh_yes = [0xb5,0x62,0x06,0x01,0x08,0x00,0x01,0x02,0x00,0x00,0x00,
 #Define servo and esc
 vehicle_servo = VehiclePWMModule.vehiclePWM("servo")
 vehicle_esc = VehiclePWMModule.vehiclePWM("esc")
+#Define secondary waypoint for bearing approximation
+#This is a location in the middle of africa
+lat2 = -2.881601
+lon2 = 24.996096
+phi2 = lat*(pi/180)
+lam2 = lon*(pi/180)
+rE = 6371.008 #Earth's mean volumetric radiuss
 
 def comm(msg):
 	for x in range(0,10):
@@ -71,6 +78,23 @@ while(True):
 		pos = ubl.GPSfetch()
 		if (pos != None):
 			print pos
+			
+			#Prepare coordinate variables in order to calculate bearing
+			lat = pos['lat']
+			lon = pos['lon']
+			phi = lat*(pi/180)
+			lam = lon*(pi/180)
+			
+			#Equirectangular distance Approximation
+			x = (lam2-lam)*cos((phi+phi2)/2)
+			y = (phi2-phi)
+			d = rE*sqrt((x*x)+(y*y))
+			print d
+			
+			#Forward Bearing from Equirectagular Approximation
+			bearWP = atan2(x,y)*(180/pi)
+			print bearWP
+			
 		#time.sleep(0.1)
 
 	except KeyboardInterrupt:

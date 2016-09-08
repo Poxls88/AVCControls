@@ -21,11 +21,15 @@ https://shahriar.svbtle.com/importing-star-in-python
 http://stackoverflow.com/questions/1621831/how-can-i-convert-coordinates-on-a-square-to-coordinates-on-a-circle
 
 Resources Logging:
+https://docs.python.org/2.7/howto/logging.html#advanced-logging-tutorial
+https://docs.python.org/2.7/howto/logging-cookbook.html#logging-to-multiple-destinations
+https://docs.python.org/2.7/library/logging.html#logger-objects
 
 Resources Headings:
 https://cdn-shop.adafruit.com/datasheets/AN203_Compass_Heading_Using_Magnetometers.pdf
 https://docs.python.org/2/library/math.html (look for atan2())
 http://aviation.stackexchange.com/questions/8000/what-are-the-differences-between-bearing-vs-course-vs-direction-vs-heading-vs-tr
+http://cache.freescale.com/files/sensors/doc/app_note/AN4248.pdf
 
 Resources Bugs:
 https://community.emlid.com/t/bug-magnetometer-reading-process-fail/688 #Community is aware of problem, but only C++ fixes are implemented

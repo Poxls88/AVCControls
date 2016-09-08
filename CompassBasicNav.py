@@ -166,16 +166,26 @@ while True:
 		#Calculate the heading counterclockwise. (angle between the vehicle and NORTH)
 		#If the vehicle faces WEST report 90 degrees from north (1/2 pi)
 		#If the vehicle faces EAST report -90 degrees from north (-1/2 pi)
-		headRadSign = math.atan2(xCtrd,yCtrd)
+		headRadSign = math.atan2(yCtrd,xCtrd) #atan2 in python takes (y, x). This is opposite to excel
 		headDegSign = headRadSign*(180/math.pi)
 		
 		#Convert the heading to range from 0-360
 		#If the vehicle faces WEST report 90 degrees from north (1/2 pi)
 		#If the vehicle faces EAST reoprt 270 degrees from north (3/2 pi)
-		headRad = headRadSign%math.pi
-		headDeg = headDegSign%360
+		headRad = headRadSign%math.pi #Good for debugging, but unecessary to calculate heading
+		headDeg = headDegSign%360 #Good for debugging, but unecessary to calculate heading
 		print 'Radians heading from north: %f \n' % (headRad)
 		print 'Degrees heading from north: %f \n' % (headDeg)
+		
+		#Find the ccw angle between vehicle's heading and target, this is the Relative Bearing.
+		#This uses our vehicle as the reference "0" degree and equivalently reorients the target around the perspective of the vehicle
+		bearBasic = (target-headDegSign)%360
+		#bearRel = (target-headDeg)%360. Has more roundoff error
+		#bearRel = (headDeg-target)%360. Uses target as the reference "0" degree and equivalently reorients the vehicle around the target's perspective.
+		#Also, the angle between the target and north is the Magnetic Heading.
+		
+		#Finally useful Relative Bearings are <180 and include a sign to denote direction. Subtracting by 360 adds that sign.
+		bearRel=bearBasic-360 if bearBasic>180 else bearRel=bearBasic
 		
 		if (abs(yRaw - yMean) < 1): #If Y is inside a small threshold of its median the vehicle faces NORTH or SOUTH:
 			if (xRaw >= xMean): #If X reads above its median, the vehicle faces NORTH
@@ -188,16 +198,13 @@ while True:
 			#Y points NORTH and reads above its median, meaning the vehicle faces mostly WEST
 			#Y points SOUTH and reads below its median, meaning the vehicle faces mostly EAST
 
-		if (abs(headDeg-target) > 10): #If not heading in correct direction
-			#Find the angle between vehicle's heading and target, this is the Relative Bearing.
-			#Equivalently this reorients the perspective so that the target is the "0" degree
-			bearRel = (headDeg-target)%360
-			if (bearRel <= 180): #If our current bearing offset is to the left of the target
-				#Turn right
-				vehicle_servo.steer(50)
-			else: #Otherwise the bearing offset is to the right of the target
+		if (abs(bearRel)<10): #If not heading in correct direction
+			if (bearRel > 0): #If our current bearing offset is to the right of the target
 				#Turn left
 				vehicle_servo.steer(120)
+			else: #Otherwise the bearing offset is to the left of the target
+				#Turn right
+				vehicle_servo.steer(50)
 		else:#Stay centered
 			vehicle_servo.center()
 			
