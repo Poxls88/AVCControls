@@ -7,7 +7,6 @@ Requirements: Adafruit I2C and PCA9685 PWM generator drivers.
 Use: Connect the Savox Servo and Xerun Esc to the Navio+ servo rail. Include this module in any python script. Create an object from the "vehiclePWM" class. Control it using the available methods.
 
 Updates:
-- September 10, 2016. Attempted to add basic PID to steer() module, but removed it because the wheels' friction prevents precise movement.
 - September 9, 2016. Argument "deg" of steer() module now requires counterclockwise angles from +-35 corresponding with those used by navigation.
 	The incoming argument "deg" is now internally converted from ccw to cw units in order to work properly with the PWM module.
 - May 26, 2016. Discovered the mallest equivalent accel() values are (1)&(-5) and that all (-4),(-5),(-6) calculate the same 12bit output, so 
@@ -86,6 +85,8 @@ class vehiclePWM:
 		self.PWM_MaxWidth = 0.002675 #S. This calculation was updated on April 30, 2016. It is made small enough to work at 50Hz
 		self.PWM_Range = self.PWM_MaxWidth - self.PWM_MinWidth #0.00199
 		self.SERVO_Range = 180.0 #Define servo degrees of movement. Must be a float for correct calculations/operation
+		self.changer = 0
+		self.lastDeg = 0
 
 	def escInit(self):
 		self.NAVIO_RCOUTPUT = 5
@@ -115,7 +116,21 @@ class vehiclePWM:
 		deg = 120 to turn full left
 		deg = 81 to center, even though it is not the median of the range
 		"""
-		deg = 85 + deg #Convert from +-35 to 50-120
+		#changer = 0 at the top
+		direction = math.pow(-1,deg<0)#returns 1 if deg is positive, -1 if deg is negative
+
+		#So long as the deg is the same set a target 1/4 the max range and iteratively approach target
+		targetDeg = deg+(15*direction)#Same sign as deg and 15 more
+		#If the deg is the same keep iterating closer
+		if (abs(deg - self.lastDeg)>5):
+			self.changer = min((self.changer + 10),20) #changer will iterate until it maxes at 15
+		else:
+			self.changer = 0
+		self.lastDeg = deg
+		iterateDeg = targetDeg - self.changer*direction #the offset will iteratively approach deg
+		deg = 85 + iterateDeg
+
+		###deg = 85 + deg #Convert from +-35 to 50-120
 		
 		PWM_Width = self.PWM_MinWidth + (self.PWM_Range * (deg/self.SERVO_Range))# Convert our 180 degree positions to PWM widths in seconds
 		SERVO_move = math.trunc((4096.0 * PWM_Width * self.frequency) -1)#Convert PWM widths to 12 bits (a scale of 0-4095) to write to the PCA9685.

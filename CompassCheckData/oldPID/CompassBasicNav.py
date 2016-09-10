@@ -8,9 +8,7 @@ Use: Input a desired direction and the vehicle will try to turn itself that way.
 	The program will calculate the vehicles current heading and the bearing to the desired angle. The vehicle will steer towards the angle.
 
 Updates:
-September 9, 2016. Attempted to add basic PID (instead of in VehiclePWMModule) for steering towards the bearing, by increasing the steering angle
-	by 5 more than the bearing angle. Removed it because the wheels' friction prevents precise movement. In order to keep some control
-	the old modular steering was reinstated.
+- September 9, 2016. Since PID is not yet implemented in the VehiclePWMModule steering increments by 5 to overcome friction
 
 - September 8, 2016. Cleaned compling bugs and tested inside finding that its basic ability to steer towards a degree works!
 	Replaced print statements with output from the logging library. root_log prints to the console, data_log formats csv and prints to a file.
@@ -174,6 +172,9 @@ vehicle_esc.stop()
 vehicle_esc.rest()
 vehicle_servo.center()
 
+lastAngle = 0
+steerAngle = 0
+
 while True:
 	try:
 		#Read our magnetometer
@@ -229,30 +230,28 @@ while True:
 			#Y points SOUTH and reads below its median, meaning the vehicle faces mostly EAST
 		'''
 		if (abs(bearRel)>8): #If not heading in correct direction
-			if (bearRel > 0): #If bearing is to the right of target
-				#Turn left
-				if (bearRel < 45):
-					vehicle_servo.steer(15)
-					print '15'
-				#elif (bearRel < 90):
-				#	vehicle_servo.steer(25)
-				#	print '25'
-				else:
-					vehicle_servo.steer(35)
-					print '35'
-			else: #If bearing is to the left of target
-				#Turn right
-				if (bearRel > -45):
-					vehicle_servo.steer(-15)
-					print '-15'
-				#elif (bearRel > -90):
-				#	vehicle_servo.steer(-25)
-				#	print '-25'
-				else:
-					vehicle_servo.steer(-35)
-					print '-35'
 			#Convert bearing angle to possible steering angle
-			#vehicle_servo.steer(bearRel*35/180) #steer(+-35) is largest value and bearRel is signed
+			'''
+			#Give the servo extra oomph since PID is not implemented
+			#Doesn't work as well as I'd like
+			#Move the servo in degrees of 8 to overcome friction
+			thisAngle = abs(bearRel)
+			diffAngle = abs(thisAngle - lastAngle)
+			#print diffAngle
+			if (abs(thisAngle - lastAngle) > 2):
+				if (bearRel>0):
+					sign = 1
+				else:
+					sign = -1
+				steerAngle = bearRel+(30*sign)
+				lastAngle = thisAngle
+				print steerAngle
+				#print lastAngle
+			vehicle_servo.steer(steerAngle*35/180) #steer(+-35) is largest value and bearRel is signed
+			'''
+
+			vehicle_servo.steer(bearRel*35/180) #steer(+-35) is largest value and bearRel is signed
+			
 			'''
 			if (bearRel > 0): #If our current bearing offset is to the right of the target
 				#Turn left
@@ -263,7 +262,6 @@ while True:
 			'''
 		else:#Stay centered
 			vehicle_servo.center()
-			print 'center'
 			time.sleep(0.05)
 			
 	except KeyboardInterrupt:
