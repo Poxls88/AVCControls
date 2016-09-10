@@ -17,10 +17,10 @@ vehicle_servo = VehiclePWMModule.vehiclePWM("servo")
 vehicle_esc = VehiclePWMModule.vehiclePWM("esc")
 #Define secondary waypoint for bearing approximation
 #This is a location in the middle of africa
-lat2 = -2.881601
-lon2 = 24.996096
-phi2 = lat*(pi/180)
-lam2 = lon*(pi/180)
+lat2 = 32.871894
+lon2 = -117.2450076
+phi2 = lat2*(math.pi/180)
+lam2 = lon2*(math.pi/180)
 rE = 6371.008 #Earth's mean volumetric radiuss
 
 def comm(msg):
@@ -63,7 +63,7 @@ def GPSNavInit():
 
 vehicle_esc.stop()
 vehicle_esc.rest()
-vehicle_servo.center()
+#vehicle_servo.center()
 GPSNavInit()
 #Start the NAVposllh messages
 time.sleep(1)
@@ -82,18 +82,23 @@ while(True):
 			#Prepare coordinate variables in order to calculate bearing
 			lat = pos['lat']
 			lon = pos['lon']
-			phi = lat*(pi/180)
-			lam = lon*(pi/180)
+			phi = lat*(math.pi/180)
+			lam = lon*(math.pi/180)
 			
 			#Equirectangular distance Approximation
-			x = (lam2-lam)*cos((phi+phi2)/2)
+			#The original formula from online calculates clockwise so 0-180 is east and 0--180 is west
+			#x = (lam2-lam)*math.cos((phi+phi2)/2)
+			#y = (phi2-phi)
+			#My own formula calculates counterclockwise so 0-180 is west and 0--180 is east
+			x = (lam-lam2)*math.cos((phi+phi2)/2)
 			y = (phi2-phi)
-			d = rE*sqrt((x*x)+(y*y))
-			print d
+			d = rE*math.sqrt((x*x)+(y*y))
+			print 'distance', d
 			
 			#Forward Bearing from Equirectagular Approximation
-			bearWP = atan2(x,y)*(180/pi)
-			print bearWP
+			bearWPsign = math.atan2(x,y)*(180/math.pi)
+			bearWP = bearWPsign%360 #removes the sign so counter clockwise 0-360
+			print 'bearing wp', bearWP
 			
 		#time.sleep(0.1)
 
