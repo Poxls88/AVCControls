@@ -143,7 +143,7 @@ class U_blox:
 		
 		#If the buffer held a NAVposllh message
 		if((curr_mess.msg_class  == 0x01) & (curr_mess.msg_id == 0x02)):
-			print "NAVposllh message"
+			#print "NAVposllh message"
 			msg = NavPosllhMsg()
 			curr_values = struct.unpack("<IiiiiII", str(bytearray(curr_mess.msg_payload)))
 			msg.itow = curr_values[0]#Assign the current values into the msg object's parameters
@@ -158,7 +158,7 @@ class U_blox:
 		
 		#If the buffer held a NAVstatus message
 		if((curr_mess.msg_class == 0x01) & (curr_mess.msg_id == 0x03)):
-			print "NAVstatus message"
+			#print "NAVstatus message"
 			msg = NavStatusMsg()
 			msg.fixStatus = curr_mess.msg_payload[4]
 			msg.fixOk = curr_mess.msg_payload[5]
