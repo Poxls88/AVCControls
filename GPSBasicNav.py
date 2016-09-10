@@ -90,9 +90,9 @@ def GPSNavInit():
 	#print 'NAVstatus stopped \n'
 	
 	#Wiggle weels to indicate done init
-	vehicle_servo.steer(45)
+	vehicle_servo.steer(-35)
 	time.sleep(0.5)
-	vehicle_servo.steer(105)
+	vehicle_servo.steer(35)
 	time.sleep(0.5)
 	vehicle_servo.center()
 

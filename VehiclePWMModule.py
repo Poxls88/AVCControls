@@ -7,6 +7,8 @@ Requirements: Adafruit I2C and PCA9685 PWM generator drivers.
 Use: Connect the Savox Servo and Xerun Esc to the Navio+ servo rail. Include this module in any python script. Create an object from the "vehiclePWM" class. Control it using the available methods.
 
 Updates:
+- September 9, 2016. Argument "deg" of steer() module now requires counterclockwise angles from +-35 corresponding with those used by navigation.
+	The incoming argument "deg" is now internally converted from ccw to cw units in order to work properly with the PWM module.
 - May 26, 2016. Discovered the mallest equivalent accel() values are (1)&(-5) and that all (-4),(-5),(-6) calculate the same 12bit output, so 
 	changing the mapping might not make a differenc. Also, centered servo's are at about steer(81)
 - May 24, 2016. Changed variable PreviousSpeed to a class attribute instead of an object variable. This corrects flow control in method accel()
@@ -106,10 +108,14 @@ class vehiclePWM:
 # ---- Servo Outputs ----
 	def steer(self, deg):
 		"""
+		steering range is 70 degrees
 		deg = 50 to turn full right
 		deg = 120 to turn full left
-		deg = 81 to center
+		deg = 81 to center, even though it is not the median of the range
 		"""
+		
+		deg = 85 + deg #Convert from +-35 to 50-120
+		
 		PWM_Width = self.PWM_MinWidth + (self.PWM_Range * (deg/self.SERVO_Range))# Convert our 180 degree positions to PWM widths in seconds
 		SERVO_move = math.trunc((4096.0 * PWM_Width * self.frequency) -1)#Convert PWM widths to 12 bits (a scale of 0-4095) to write to the PCA9685.
 		try:

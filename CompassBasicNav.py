@@ -2,7 +2,7 @@
 Robotritons testing version of compass navigation.
 
 Purpose: Use a magnetometer to reliably steer the vehicle.
-Requirements: An InvenSense MPU-9250. The python modules logging, sys, spidev, time, math, navio.util, and navio.mpu9250
+Requirements: An InvenSense MPU-9250. The python modules logging, sys, spidev, time, math, navio.util, and navio.mpu9250_better
 Use: Input a desired direction and the vehicle will try to turn itself that way. Place the vehicle facing north. Instantiate an imu object, then
 	initialize it, then calibrate N,E,S,W, finally call the read_mag() method to update the list of magnetometer_data.
 	The program will calculate the vehicles current heading and the bearing to the desired angle. The vehicle will steer towards the angle.
@@ -20,7 +20,6 @@ Resources:
 https://docs.emlid.com/navio/Navio-dev/mpu9250-imu/
 https://store.invensense.com/datasheets/invensense/MPU9250REV1.0.pdf
 https://shahriar.svbtle.com/importing-star-in-python
-http://stackoverflow.com/questions/1621831/how-can-i-convert-coordinates-on-a-square-to-coordinates-on-a-circle
 
 Resources Logging:
 https://docs.python.org/2.7/howto/logging.html#advanced-logging-tutorial
@@ -203,7 +202,7 @@ while True:
 		#bearRel = (headDeg-target)%360. Uses target as the reference "0" degree and equivalently reorients the vehicle around the target's perspective.
 		#Also, the angle between the target and north is the Magnetic Heading.
 		
-		#Finally useful Relative Bearings are <180 and include a sign to denote direction. Subtracting by 360 adds that sign.
+		#Finally, useful Relative Bearings are <180 and include a sign to denote direction. Subtracting by 360 adds that sign.
 		if (bearBasic>180):
 			bearRel=bearBasic-360
 		else:
@@ -222,12 +221,16 @@ while True:
 			#Y points SOUTH and reads below its median, meaning the vehicle faces mostly EAST
 		'''
 		if (abs(bearRel)>10): #If not heading in correct direction
+			#Convert bearing angle to possible steering angle
+			vehicle_servo.steer(bearRel*35/180) #steer(+-35) is largest value and bearRel is signed
+			'''
 			if (bearRel > 0): #If our current bearing offset is to the right of the target
 				#Turn left
 				vehicle_servo.steer(120)
 			else: #Otherwise the bearing offset is to the left of the target
 				#Turn right
 				vehicle_servo.steer(50)
+			'''
 		else:#Stay centered
 			vehicle_servo.center()
 			time.sleep(0.05)
