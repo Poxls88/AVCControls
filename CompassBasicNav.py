@@ -8,7 +8,9 @@ Use: Input a desired direction and the vehicle will try to turn itself that way.
 	The program will calculate the vehicles current heading and the bearing to the desired angle. The vehicle will steer towards the angle.
 
 Updates:
-September 9, 2016. Attempted to add basic PID (instead of in VehiclePWMModule) for steering towards the bearing, by increasing the steering angle
+- September 10, 2016. calibrateMagNorth() -> calibrateMag(). Updated so sweep vehicle through all angles, don't just hold at cardinal directions
+
+- September 9, 2016. Attempted to add basic PID (instead of in VehiclePWMModule) for steering towards the bearing, by increasing the steering angle
 	by 5 more than the bearing angle. Removed it because the wheels' friction prevents precise movement. In order to keep some control
 	the old modular steering was reinstated.
 
@@ -103,76 +105,79 @@ vehicle_esc = VehiclePWMModule.vehiclePWM("esc")
 #Initialize the angle from north to the target, this is the course angle.
 target = 90
 
-def calibrateMagNorth():
+def calibrateMag():
+	time.sleep(5) #5 Seconds before calibration begins
+	
+	#Indicate start of calibration
+	vehicle_servo.steer(35)
+	time.sleep(0.5)
+	vehicle_servo.steer(-35)
+	time.sleep(0.5)
+	vehicle_servo.center()
+	
+	#Capture about 1000 points for the whole sweep
 	xSet = []
 	ySet = []
-	log_root.info('Place North')
-	log_mag.info('Place North')
-	time.sleep(4)
-	for x in range(10):
+	for x in xrange(1000):
 		imu.read_mag()
 		xSet.append(imu.magnetometer_data[0])
 		ySet.append(imu.magnetometer_data[1])
 		log_mag.info('%f,%f' %(xSet[x],ySet[x]))
-		time.sleep(0.5)
-	xNorth = float(sum(xSet))/max(len(xSet),1)#Mean
-	yNorth = float(sum(ySet))/max(len(ySet),1)
-	
-	log_root.info('Place East')
-	log_mag.info('Place East')
-	time.sleep(4)
-	for x in range(10):
-		imu.read_mag()
-		xSet.append(imu.magnetometer_data[0])
-		ySet.append(imu.magnetometer_data[1])
-		log_mag.info('%f,%f' %(xSet[x],ySet[x]))
-		time.sleep(0.5)
-	xEast = float(sum(xSet))/max(len(xSet),1)#Mean
-	yEast = float(sum(ySet))/max(len(ySet),1)
+		if (x == 250):
+			#Indicate 1/4 done with 1 steer
+			vehicle_servo.steer(35)
+			time.sleep(0.5)
+			vehicle_servo.center()
+		elif (x == 500):
+			#Indicate 2/4 done with 2 steers
+			vehicle_servo.steer(35)
+			time.sleep(0.5)
+			vehicle_servo.center()
+			time.sleep(0.5)
+			vehicle_servo.steer(35)
+			time.sleep(0.5)
+			vehicle_servo.center()
+		elif (x == 750):
+			#Indicate 3/4 done with 3 steers
+			vehicle_servo.steer(35)
+			time.sleep(0.5)
+			vehicle_servo.center()
+			time.sleep(0.5)
+			vehicle_servo.steer(35)
+			time.sleep(0.5)
+			vehicle_servo.center()
+			time.sleep(0.5)
+			vehicle_servo.steer(35)
+			time.sleep(0.5)
+			vehicle_servo.center()
+		else:
+			time.sleep(0.05)
 
-	log_root.info('Place South')
-	log_mag.info('Place South')
-	time.sleep(4)
-	for x in range(10):
-		imu.read_mag()
-		xSet.append(imu.magnetometer_data[0])
-		ySet.append(imu.magnetometer_data[1])
-		log_mag.info('%f,%f' %(xSet[x],ySet[x]))
-		time.sleep(0.5)
-	xSouth = float(sum(xSet))/max(len(xSet),1)#Mean
-	ySouth = float(sum(ySet))/max(len(ySet),1)
-
-	log_root.info('Place West')
-	log_mag.info('Place West')
-	time.sleep(4)
-	for x in range(10):
-		imu.read_mag()
-		xSet.append(imu.magnetometer_data[0])
-		ySet.append(imu.magnetometer_data[1])
-		log_mag.info('%f,%f' %(xSet[x],ySet[x]))
-		time.sleep(0.5)
-	xWest = float(sum(xSet))/max(len(xSet),1)
-	yWest = float(sum(ySet))/max(len(ySet),1)#Mean
+	#Indicate end of calibration
+	vehicle_servo.steer(35)
+	time.sleep(0.5)
+	vehicle_servo.steer(-35)
+	time.sleep(0.5)
+	vehicle_servo.center()
 	
+	#Mean values are the coordinates in the center of all readings (zero in the adafruit datasheet)
+	xMean = float(sum(xSet))/max(len(xSet),1)
+	yMean = float(sum(ySet))/max(len(ySet),1)
 	#Y holds similar values for NORTH and SOUTH
 	#X holds similar values for EAST and WEST
-	means = {'xN':xNorth, 'yN':yNorth, 'xE':xEast, 'yE':yEast, 'xS':xSouth, 'yS':ySouth, 'xW':xWest, 'yW':yWest}
-	time.sleep(0.5)
-	return means
+	#If Y is inside a small threshold of its median the vehicle faces NORTH or SOUTH
+	#Otherwise
+	#	Y points NORTH and reads above its median, meaning the vehicle faces mostly WEST
+	#	Y points SOUTH and reads below its median, meaning the vehicle faces mostly EAST
+	return {'x':xMean,'y':yMean}
 
-#Calculate our average direction values
-magMean = calibrateMagNorth()
-#These mean values are the coordinates in the center of all readings
-yMean = (magMean["yN"] + magMean["yE"] + magMean["yS"] + magMean["yW"])/4
-xMean = (magMean["xN"] + magMean["xE"] + magMean["xS"] + magMean["xW"])/4
-#These median values (zero in the adafruit datasheet) could also be coordinates
-yMedian = (magMean["yN"] + magMean["yS"])/2 #Y's values are most useful
-xMedian = (magMean["xE"] + magMean["xW"])/2
+#Store our calibrated mean values
+magMeans = calibrateMag() #Y's values are most useful
 
 #Start vehicle stopped
 vehicle_esc.stop()
 vehicle_esc.rest()
-vehicle_servo.center()
+vehicle_servo.rest()
 
 while True:
 	try:
@@ -186,8 +191,8 @@ while True:
 		log_mag.debug('%f,%f' % (xRaw,yRaw))
 		
 		#Translate current reading so that it lies on a circle centered on the origin
-		yCtrd = yRaw-yMean#Current readings minus the mean
-		xCtrd = xRaw-xMean 
+		yCtrd = yRaw-magMeans['y']#Current readings minus the mean
+		xCtrd = xRaw-magMeans['x']
 		
 		#Calculate the heading counterclockwise. (angle between the vehicle and NORTH)
 		#If the vehicle faces WEST report 90 degrees from north (1/2 pi)
@@ -216,19 +221,9 @@ while True:
 		else:
 			bearRel=bearBasic
 		log_root.debug('bearRel: %f' % (bearRel))
-		'''
-		if (abs(yRaw - yMean) < 5): #If Y is inside a small threshold of its median the vehicle faces NORTH or SOUTH:
-			if (xRaw >= xMean): #If X reads above its median, the vehicle faces NORTH
-				log_root.info('NORTH')
-			elif (xRaw < xMean): #If X reads below its median, the vehicle faces SOUTH
-				log_root.info('SOUTH')
-			else:
-				log_root.info('Direction? N/S')
-			#Otherwise
-			#Y points NORTH and reads above its median, meaning the vehicle faces mostly WEST
-			#Y points SOUTH and reads below its median, meaning the vehicle faces mostly EAST
-		'''
-		if (abs(bearRel)>8): #If not heading in correct direction
+
+		#If not heading in correct direction
+		if (abs(bearRel)>8):
 			if (bearRel > 0): #If bearing is to the right of target
 				#Turn left
 				if (bearRel < 45):
@@ -253,14 +248,6 @@ while True:
 					print '-35'
 			#Convert bearing angle to possible steering angle
 			#vehicle_servo.steer(bearRel*35/180) #steer(+-35) is largest value and bearRel is signed
-			'''
-			if (bearRel > 0): #If our current bearing offset is to the right of the target
-				#Turn left
-				vehicle_servo.steer(120)
-			else: #Otherwise the bearing offset is to the left of the target
-				#Turn right
-				vehicle_servo.steer(50)
-			'''
 		else:#Stay centered
 			vehicle_servo.center()
 			print 'center'
