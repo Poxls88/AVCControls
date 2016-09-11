@@ -72,7 +72,7 @@ log_mag = logging.getLogger('magnetometer')
 log_mag.setLevel(logging.DEBUG) #Change debug level to control file output <----------
 
 #Create a handler that outputs to a csv file
-handler_mag = logging.FileHandler('CompassCheckData/magnetometerData.csv',mode='w')
+handler_mag = logging.FileHandler('compassCheckData/magnetometerData.csv',mode='w')
 handler_mag.setLevel(logging.DEBUG) #This handler handles all outputs to the file
 
 #Create a formatter that labels the data
@@ -108,6 +108,7 @@ target = 90
 def calibrateMag():
 	time.sleep(5) #5 Seconds before calibration begins
 	
+	log_root.info('calibrateMag')
 	#Indicate start of calibration
 	vehicle_servo.steer(35)
 	time.sleep(0.5)
@@ -118,17 +119,18 @@ def calibrateMag():
 	#Capture about 1000 points for the whole sweep
 	xSet = []
 	ySet = []
-	for x in xrange(1000):
+	for x in xrange(600):
 		imu.read_mag()
 		xSet.append(imu.magnetometer_data[0])
 		ySet.append(imu.magnetometer_data[1])
 		log_mag.info('%f,%f' %(xSet[x],ySet[x]))
-		if (x == 250):
+		if (x == 150):
 			#Indicate 1/4 done with 1 steer
 			vehicle_servo.steer(35)
 			time.sleep(0.5)
 			vehicle_servo.center()
-		elif (x == 500):
+		elif (x == 300):
+			log_root.info('1/2 calibrateMag')
 			#Indicate 2/4 done with 2 steers
 			vehicle_servo.steer(35)
 			time.sleep(0.5)
@@ -137,7 +139,7 @@ def calibrateMag():
 			vehicle_servo.steer(35)
 			time.sleep(0.5)
 			vehicle_servo.center()
-		elif (x == 750):
+		elif (x == 450):
 			#Indicate 3/4 done with 3 steers
 			vehicle_servo.steer(35)
 			time.sleep(0.5)
@@ -153,6 +155,8 @@ def calibrateMag():
 		else:
 			time.sleep(0.05)
 
+	log_root.info('End calibrateMag')
+	log_mag.info('End calibrateMag')
 	#Indicate end of calibration
 	vehicle_servo.steer(35)
 	time.sleep(0.5)

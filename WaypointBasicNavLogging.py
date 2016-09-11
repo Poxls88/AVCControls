@@ -12,7 +12,8 @@ Use: Set a waypoint and the vehicle on the ground. In the code make sure to inst
 	and the magnetometer using imu=MPU9250()
 
 Updates:
-- September 10, 2016. Wrote structure for a single waypoint navigation. Shortened a few comments to improve readability.
+- September 10, 2016. Wrote structure for a single waypoint navigation. Shortened a few comments to improve readability. Included logging to
+	console and file 'waypointData/waypointBasic.csv'. Added new exception handling.
 
 - September 9, 2016. Created file.
 
@@ -35,7 +36,18 @@ https://github.com/ArduPilot/ardupilot/pull/2487 #The immediate solution was to 
 https://github.com/ArduPilot/ardupilot/pull/2493 #Emlid developers have fixed the C++ driver
 https://github.com/ArduPilot/ardupilot/pull/2504 #Someone else did it their own way for C++
 
+Resources Logging:
+https://docs.python.org/2.7/howto/logging.html#advanced-logging-tutorial
+https://docs.python.org/2.7/howto/logging-cookbook.html#logging-to-multiple-destinations
+https://docs.python.org/2.7/library/logging.html#logger-objects
+
+Resources Exceptions And Traceback:
+https://docs.python.org/2/library/exceptions.html#exceptions.TypeError
+https://wiki.python.org/moin/HandlingExceptions
+http://stackoverflow.com/questions/4564559/get-exception-description-and-stack-trace-which-caused-an-exception-all-as-a-st
 """
+import logging
+import traceback
 import sys
 import time
 import math
@@ -46,6 +58,30 @@ from VehicleGPSModule import *
 from navio.mpu9250_better import MPU9250
 
 navio.util.check_apm()
+
+# ----- Logging Setup -----
+#1) Loggers create log records. They are the outermost interface included in appliation code. root logger is default.
+#2) Handlers send the log records to particular desitnations.
+#3) Formatters specify the layout of the final output
+
+#All logging defaults to the root logger. Configure the default destination with root logger's built-in handler
+logging.basicConfig(level=logging.DEBUG,format='%(levelname)-8s,%(message)s',filename='waypointData/waypointBasic.csv',filemode='w')
+log_root = logging.getLogger('')#Assign an easy name to the root logger
+#Create a separate handler output to the console stream. By default it's messages will propagate to the root ancestor.
+handler_console = logging.StreamHandler()
+handler_console.setLevel(logging.WARNING) #Change debug level to control console output <----------
+#WARNING is default, INFO includes loop data, DEBUG includes calibration data too
+#Create a formatter that labels the console data
+format_console = logging.Formatter('%(levelname)-6s %(name)-6s %(message)s')
+#Add format to handler, then handler to logger
+handler_console.setFormatter(format_console)
+log_root.addHandler(handler_console)
+#Note: only loggers propagate messages to the root ancestor without considering the message levelname
+#Different handlers for the same logger (root) will simply obey the higherarchy of levelnames to determine output(s)
+
+#Example in text logging call
+#log_root.info('This is some data %f' % variable)
+# ----- End Log Setup -----
 
 # ---- Define Methods ----
 	# --- GPS Methods ---
@@ -60,22 +96,23 @@ def commUblox(msg):
 		ubl.bus.xfer2(msg)
 
 def GPSNavInit():
+	log_root.warning('GPSNavInit')
 	#reset/stop the Ublox messages
 	commUblox(CFGmsg8_NAVposllh_no)
 	commUblox(CFGmsg8_NAVstatus_no)
 	#Enable NAVstatus messages
 	commUblox(CFGmsg8_NAVstatus_yes)
 	#Wait until we have a confirmed GPS fix
-	goodGPSfix = False
+	goodGPSfix = True
 	while not (goodGPSfix):
 		GPSfix = ubl.GPSfetch()
-		#print GPSfix
+		log_root.debug(GPSfix)
 		if (GPSfix):
 			if((GPSfix['fStatus'] == 2) or (GPSfix['fStatus'] == 3) or (GPSfix['fStatus'] == 4)):
 				goodGPSfix = True
-	print 'goodFix \n'
 	#After confirmed fix, disable Navstatus messages
 	commUblox(CFGmsg8_NAVstatus_no)
+	log_root.warning('goodFix and end GPSNavInit')
 	#Wiggle weels to indicate done init
 	vehicle_servo.steer(45)
 	time.sleep(0.5)
@@ -88,6 +125,7 @@ def GPSNavInit():
 def calibrateMag():
 	time.sleep(5) #5 Seconds before calibration begins
 	
+	log_root.warning('calibrateMag')
 	#Indicate start of calibration
 	vehicle_servo.steer(35)
 	time.sleep(0.5)
@@ -102,12 +140,14 @@ def calibrateMag():
 		imu.read_mag()
 		xSet.append(imu.magnetometer_data[0])
 		ySet.append(imu.magnetometer_data[1])
+		log_root.debug('%f,%f' %(xSet[x],ySet[x]))
 		if (x == 150):
 			#Indicate 1/4 done with 1 steer
 			vehicle_servo.steer(35)
 			time.sleep(0.5)
 			vehicle_servo.center()
 		elif (x == 300):
+			log_root.warning('1/2 calibrateMag')
 			#Indicate 2/4 done with 2 steers
 			vehicle_servo.steer(35)
 			time.sleep(0.5)
@@ -132,6 +172,7 @@ def calibrateMag():
 		else:
 			time.sleep(0.05)
 
+	log_root.warning('end calibrateMag')
 	#Indicate end of calibration
 	vehicle_servo.steer(35)
 	time.sleep(0.5)
@@ -182,7 +223,7 @@ vehicle_esc = VehiclePWMModule.vehiclePWM("esc")
 vehicle_servo = VehiclePWMModule.vehiclePWM("servo")
 ubl = U_blox()
 imu = MPU9250()
-print 'Connection established: %s' %(imu.testConnection())
+log_root.warning('Connection established: %s' % imu.testConnection())
 # ---- End Instantiate Critical Objects ----
 
 # ---- Initialize esc, servo, IMU & GPS ----
@@ -193,7 +234,7 @@ vehicle_esc.rest()
 vehicle_servo.rest()
 imu.initialize()
 GPSNavInit()
-print 'End initialize IMU & GPS'
+log_root.warning('End initialize IMU & GPS')
 # ---- End Initialize IMU & GPS ----
 
 # ---- Calibrate IMU & Re-enable GPS Messages----
@@ -203,56 +244,59 @@ magMeans = calibrateMag() #Mean values are the coordinates in the center of all 
 commUblox(CFGmsg8_NAVposllh_yes)
 #backupMsg = [0xb5, 0x62, 0x06, 0x01, 0x03, 0x00, 0x01, 0x02, 0x01, 0x0e, 0x47]
 #commUblox(backupMsg)
-print 'End calibrate IMU & Re-enable GPS messages'
+log_root.warning('End calibrate IMU & Re-enable GPS messages')
 # ---- End Calibrate IMU & Re-enable GPS Messages----
 
 #Know next location
 #calculate next waypoint heading
 #Set course to move towards next waypoint
 
-bearWP = 0
 timeout = 0
+bearWP = 0
 toSpeed = 0 #Stop speed
 toAngle = 0
 
-while(True):
-	try:
+try:
+	log_root.warning('Begin try:while(True):')
+	while(True):
 		# -------------------------------------
 		# ---- Read GPS To Update Location ----
 		# -------------------------------------
-		pos = ubl.GPSfetch()
-		if (pos != None):
-			#print pos
-			if (pos['hAcc'] <= 2000000):#If GPS accurate (change to 10 for actual testing)
-				#Prepare coordinate variables in order to calculate bearing
-				lat = pos['lat']
-				lon = pos['lon']
-				phi = lat*(math.pi/180)
-				lam = lon*(math.pi/180)
-				
-				#Calculate the Approximate Distance from waypoint using an Equirectangular map model
-				'''
-				The original formula from online calculates clockwise so 0<->+180 is EAST and 0<->-180 is WEST
-				x = (lam2-lam)*math.cos((phi+phi2)/2)
-				y = (phi2-phi)
-				'''
-				#My own formula calculates counterclockwise so 0<->+180 is WEST and 0<->-180 is EAST
-				x = (lam-lam2)*math.cos((phi+phi2)/2)
-				y = (phi2-phi)
-				d = rE*math.sqrt((x*x)+(y*y)) #Only use is for debugging
-				#print 'distance', d
-				
-				#Calculate the Forward Bearing from previous Equirectangular map model
-				bearWPsign = math.atan2(x,y)*(180/math.pi)
-				bearWP = bearWPsign%360 #removes the sign so counter clockwise 0<->360
-				print 'bearing wp', bearWP
-				
-				#Reset GPS timeout since GPS received a usable message
-				timeout = 0
-				
-			else: #GPS not accurate
-				print 'Bad accuracy!'
-				#Timeout is not reset so vehicle will either: continue moving for a few more loops then stop <-or-> continue moving when horizontal accuraccy is good
+
+		#pos = ubl.GPSfetch()
+		#if (pos != None):
+		#	#print pos
+		#	if (pos['hAcc'] <= 2000000):#If GPS accurate (change to 10 for actual testing)
+		#		#Prepare coordinate variables in order to calculate bearing
+		#		lat = pos['lat']
+		#		lon = pos['lon']
+		#		phi = lat*(math.pi/180)
+		#		lam = lon*(math.pi/180)
+		#		
+		#		#Calculate the Approximate Distance from waypoint using an Equirectangular map model
+		#		'''
+		#		The original formula from online calculates clockwise so 0<->+180 is EAST and 0<->-180 is WEST
+		#		x = (lamW-lam)*math.cos((phi+phiW)/2)
+		#		y = (phiW-phi)
+		#		'''
+		#		#My own formula calculates counterclockwise so 0<->+180 is WEST and 0<->-180 is EAST
+		#		x = (lam-lamW)*math.cos((phi+phiW)/2)
+		#		y = (phiW-phi)
+		#		d = rE*math.sqrt((x*x)+(y*y)) #Only use is for debugging
+		#		#print 'distance', d
+		#		
+		#		#Calculate the Forward Bearing from previous Equirectangular map model
+		#		bearWPsign = math.atan2(x,y)*(180/math.pi)
+		#		bearWP = bearWPsign%360 #removes the sign so counter clockwise 0<->360
+		#		log_root.info('bearing wp %f' %bearWP)
+		#		
+		#		#Reset GPS timeout since GPS received a usable message
+		#		timeout = 0
+		#		
+		#	else: #GPS not accurate
+		#		log_root.warning('Bad accuracy!')
+		#		#Timeout is not reset so vehicle will either: continue moving for a few more loops then stop <-or-> continue moving when horizontal accuraccy is good
+		
 		# -----------------------------------------
 		# ---- End Read GPS To Update Location ----
 		# -----------------------------------------
@@ -275,6 +319,8 @@ while(True):
 		#Calculate the heading counterclockwise 0<->+90(WEST) then -90<->0 (EAST). Heading is angle between the vehicle and NORTH.
 		headRadSign = math.atan2(yCtrd,xCtrd) #atan2 in python takes (y, x). This is opposite to excel
 		headDegSign = headRadSign*(180/math.pi)
+		##log_root.info('headDegSign: %f' %headDegSign)
+
 		'''
 		#Convert the heading to range from 0<->360, WEST=90, EAST=270
 		headRad = headRadSign%math.pi #Good for debugging, but unecessary to calculate heading
@@ -284,16 +330,17 @@ while(True):
 		'''
 		#Calculate the relative bearing counterclockwise.
 		#Relative bearing is the angle between vehicle's heading and target. Magnetic bearing is the angle between the vehicle, target, and north.
-		bearBasic = (bearWP-headDegSign)%360 #Vehicle direction becomes "0" degree and reorients the waypoint bearing around the perspective of the vehicle.
+		bearBasic = (bearWP-headDegSign)%360 #The bearing is reoriented so that the waypoint is around the perspective of the vehicle. (vehicle direction "becomes the 0 degree")
 		#bearRel = (target-headDeg)%360. Has more roundoff error
 		#bearRel = (headDeg-target)%360. Use target as the reference "0" degree and reorients the vehicle around the target's perspective.
-		
+		##log_root.info('bearBasic: %f' %bearBasic)
+
 		#Prepare relative bearing. Keep under <180 and include a sign to denote direction.
 		if (bearBasic>180):
 			bearRel=bearBasic-360 #Subtracting by 360 adds sign
 		else:
 			bearRel=bearBasic
-		#print 'bearRel: %f' %(bearRel)
+		log_root.info('bearRel: %f' %bearRel)
 		# ---------------------------------------------------
 		# ---- End Read Magnetometer To Control Steering ----
 		# ---------------------------------------------------
@@ -326,12 +373,14 @@ while(True):
 		#Always control movement
 		if (timeout < 200): #If GPS hasn't timed out...
 			#If arrived at destination, STOP
-			if ( (abs(pos['lat']-lat2) <= 0.01) and (abs(pos['lon']-lon2) <= 0.01) ):
-				print 'waypoint!'
+			'''
+			if ( (abs(pos['lat']-latW) <= 0.01) and (abs(pos['lon']-lonW) <= 0.01) ):
+				log_root.warning('Waypoint!')
 				vehicle_esc.stop()
 				vehicle_esc.rest()
 			else: #Not arrived at destination, GO
 				vehicle_esc.accel(1)
+			'''
 			timeout = timeout + 1 #Iterate timeout
 		else: #GPS has timed out
 			vehicle_esc.stop()
@@ -340,7 +389,13 @@ while(True):
 		# ---- End Control Movement ----
 		# ------------------------------
 
-	except KeyboardInterrupt:
-		vehicle_esc.stop()
-		vehicle_servo.rest()
-		sys.exit()
+except KeyboardInterrupt:
+	log_root.warning('Abort: KeyboardInterrupt')
+except TypeError:
+	log_root.warning('Abort: TypeError')
+finally:
+	log_root.warning('Finally')
+	log_root.warning(traceback.format_exc())
+	vehicle_esc.stop()
+	vehicle_servo.rest()
+	sys.exit()
