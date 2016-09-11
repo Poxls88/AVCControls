@@ -263,6 +263,8 @@ try:
 
 		pos = ubl.GPSfetch()
 		if (pos != None):
+			#After the GPS initialization it will take about 7000 loops of pos=ubl.GPSfetch
+			#and about 7 (pos !=None) before GPS data comes in consistently
 			log_root.warning('pos')
 			log_root.debug(pos)
 			if (pos['hAcc'] <= 10):#If GPS accurate (change to 10 for actual testing)
@@ -288,11 +290,12 @@ try:
 				bearWPsign = math.atan2(x,y)*(180/math.pi)
 				bearWP = bearWPsign%360 #removes the sign so counter clockwise 0<->360
 				log_root.info('bearing wp %f' %bearWP)
+				#bearWP is changing by no more than 1.8 degrees even after the vehicle has moved 5 meters
 				
 				#Reset GPS timeout since GPS received a usable message
 				timeout = 0
 				
-			else: #GPS not accurate
+			else: #GPS not accurate. After multiple tests, i've not yet gotten a "bad accuracy" signal
 				log_root.warning('Bad accuracy!')
 				#Timeout is not reset so vehicle will either: continue moving for a few more loops then stop <-or-> continue moving when horizontal accuraccy is good
 		
@@ -316,10 +319,11 @@ try:
 		xCtrd = xRaw-magMeans['x']
 		
 		#Calculate the heading counterclockwise 0<->+90(WEST) then -90<->0 (EAST). Heading is angle between the vehicle and NORTH.
-		headRadSign = math.atan2(yCtrd,xCtrd) #atan2 in python takes (y, x). This is opposite to excel
-		headDegSign = headRadSign*(180/math.pi)
+		headNoDecRadSign = math.atan2(yCtrd,xCtrd) #atan2 in python takes (y, x). This is opposite to excel
+		headNoDecDegSign = headRadSign*(180/math.pi)
 		##log_root.info('headDegSign: %f' %headDegSign)
-
+		headDegSign = headNoDecDegSign + 11.7 #Adjust for declination (SD=11.7, boulder=8.2, avg = 10)
+		
 		'''
 		#Convert the heading to range from 0<->360, WEST=90, EAST=270
 		headRad = headRadSign%math.pi #Good for debugging, but unecessary to calculate heading
@@ -375,11 +379,12 @@ try:
 			#time.sleep(0.05)
 		
 		#Always control movement
-		if (timeout < 100): #If GPS hasn't timed out...
+		if (timeout < 150): #If GPS hasn't timed out...
 			#If arrived at destination, STOP
 			if (pos != None):
 				print pos['lat']
-				if ( (abs(pos['lat']-latW) <= 0.0002) and (abs(pos['lon']-lonW) <= 0.0002) ):
+				if ( (abs(pos['lat']-latW) <= 0.000001) and (abs(pos['lon']-lonW) <= 0.000001) ):
+					#Approaching to 6 figures is ok so long as the current timeout stays and hAcc stays
 					log_root.warning('Waypoint!')
 					vehicle_esc.stop()
 					vehicle_esc.rest()
