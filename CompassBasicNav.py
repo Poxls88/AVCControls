@@ -8,7 +8,9 @@ Use: Input a desired direction and the vehicle will try to turn itself that way.
 	The program will calculate the vehicles current heading and the bearing to the desired angle. The vehicle will steer towards the angle.
 
 Updates:
-- September 10, 2016. calibrateMagNorth() -> calibrateMag(). Updated so sweep vehicle through all angles, don't just hold at cardinal directions
+- September 10, 2016. calibrateMagNorth() -> calibrateMag(). Updated so sweep vehicle through all angles, don't just hold at cardinal directions.
+	Tested steering. +-35 is enough for sharp steer in any direction. Medium steer is hard to do because +-20 doesn't change after 30 and
+	+-15 doesn't change after center. 
 
 - September 9, 2016. Attempted to add basic PID (instead of in VehiclePWMModule) for steering towards the bearing, by increasing the steering angle
 	by 5 more than the bearing angle. Removed it because the wheels' friction prevents precise movement. In order to keep some control
@@ -231,7 +233,7 @@ while True:
 			if (bearRel > 0): #If bearing is to the right of target
 				#Turn left
 				if (bearRel < 45):
-					vehicle_servo.steer(15)
+					vehicle_servo.steer(20)
 					print '15'
 				#elif (bearRel < 90):
 				#	vehicle_servo.steer(25)
@@ -242,7 +244,7 @@ while True:
 			else: #If bearing is to the left of target
 				#Turn right
 				if (bearRel > -45):
-					vehicle_servo.steer(-15)
+					vehicle_servo.steer(-20)
 					print '-15'
 				#elif (bearRel > -90):
 				#	vehicle_servo.steer(-25)

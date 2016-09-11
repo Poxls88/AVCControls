@@ -81,9 +81,51 @@ log_root.addHandler(handler_console)
 
 #Example in text logging call
 #log_root.info('This is some data %f' % variable)
-# ----- End Log Setup -----
+# ----- End Loggin Setup -----
+
+# ---- Waypoint ----
+#EBU1 Loading Dock parkinglot south exit
+#lat = 32.882171
+#lon = -117.235711
+
+#Engineer Ln top of the "T"
+#lat = 32.882281
+#lon = -117.235354
+
+#Engineer Ln south end
+#lat = 32.881772
+#lon = -117.234741
+
+#EBU 1 Loading Dock street south end
+#lat = 32.881373
+#lon =-117.235912
+#EBU 1 Back Patio
+latW = 32.871894
+lonW = -117.2350076
+phiW = latW*(math.pi/180)
+lamW = lonW*(math.pi/180)
+rE = 6371.008 #Earth's mean volumetric radius
+# ---- End Waypoint ----
+
+# ---- Instantiate Critical Objects ----
+vehicle_esc = VehiclePWMModule.vehiclePWM("esc")
+vehicle_servo = VehiclePWMModule.vehiclePWM("servo")
+ubl = U_blox()
+imu = MPU9250()
+log_root.warning('Connection established: %s' % imu.testConnection())
+# ---- End Instantiate Critical Objects ----
 
 # ---- Define Methods ----
+	# --- Indication Methods ---
+def wiggle(num, direction): #used particularly for visual calibration cues
+	for times in range(num):
+		vehicle_servo.steer(35*direction)
+		time.sleep(0.5)
+		vehicle_servo.center()
+		time.sleep(0.5)
+	return
+	# --- End Indication Methods ---
+
 	# --- GPS Methods ---
 #Define Ublox reset messages
 CFGmsg8_NAVposllh_no = [0xb5,0x62,0x06,0x01,0x08,0x00,0x01,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x12,0xb9]#Disable Ublox from publishing a NAVposllh	
@@ -94,6 +136,7 @@ CFGmsg8_NAVposllh_yes = [0xb5,0x62,0x06,0x01,0x08,0x00,0x01,0x02,0x00,0x00,0x00,
 def commUblox(msg):
 	for x in range(0,10):
 		ubl.bus.xfer2(msg)
+	return
 
 def GPSNavInit():
 	log_root.warning('GPSNavInit')
@@ -114,24 +157,21 @@ def GPSNavInit():
 	commUblox(CFGmsg8_NAVstatus_no)
 	log_root.warning('goodFix and end GPSNavInit')
 	#Wiggle weels to indicate done init
-	vehicle_servo.steer(45)
+	vehicle_servo.steer(-35)
 	time.sleep(0.5)
-	vehicle_servo.steer(105)
+	vehicle_servo.steer(35)
 	time.sleep(0.5)
 	vehicle_servo.center()
+	return
 	# --- End GPS Methods ---
 	
 	# --- IMU Methods ---
 def calibrateMag():
-	time.sleep(5) #5 Seconds before calibration begins
-	
-	log_root.warning('calibrateMag')
+	time.sleep(4)
 	#Indicate start of calibration
-	vehicle_servo.steer(35)
-	time.sleep(0.5)
-	vehicle_servo.steer(-35)
-	time.sleep(0.5)
-	vehicle_servo.center()
+	log_root.warning('begin calibrateMag')
+	wiggle(1,1)
+	time.sleep(1) #5 seconds before calibration begins
 	
 	#Capture about 1000 points for the whole sweep
 	xSet = []
@@ -142,33 +182,17 @@ def calibrateMag():
 		ySet.append(imu.magnetometer_data[1])
 		log_root.debug('%f,%f' %(xSet[x],ySet[x]))
 		if (x == 150):
-			#Indicate 1/4 done with 1 steer
-			vehicle_servo.steer(35)
-			time.sleep(0.5)
-			vehicle_servo.center()
+			#Indicate staring 2/4 with 2 wiggles
+			#log_root.warning('begin 2/4 calibrateMag')
+			wiggle(2,1)
 		elif (x == 300):
-			log_root.warning('1/2 calibrateMag')
-			#Indicate 2/4 done with 2 steers
-			vehicle_servo.steer(35)
-			time.sleep(0.5)
-			vehicle_servo.center()
-			time.sleep(0.5)
-			vehicle_servo.steer(35)
-			time.sleep(0.5)
-			vehicle_servo.center()
+			#Indicate starting 3/4 with 3 steers
+			#log_root.warning('begin 3/4 calibrateMag')
+			wiggle(3,1)
 		elif (x == 450):
-			#Indicate 3/4 done with 3 steers
-			vehicle_servo.steer(35)
-			time.sleep(0.5)
-			vehicle_servo.center()
-			time.sleep(0.5)
-			vehicle_servo.steer(35)
-			time.sleep(0.5)
-			vehicle_servo.center()
-			time.sleep(0.5)
-			vehicle_servo.steer(35)
-			time.sleep(0.5)
-			vehicle_servo.center()
+			#Indicate starting 4/4 with 4 steers
+			#log_root.warning('begin 4/4 calibrateMag')
+			wiggle(4,1)
 		else:
 			time.sleep(0.05)
 
@@ -193,58 +217,33 @@ def calibrateMag():
 	# --- End IMU Methods ---
 # ---- End Define Methods ----
 
-# ---- Waypoint ----
-#EBU1 Loading Dock parkinglot south exit
-#lat = 32.882171
-#lon = -117.235711
-
-#Engineer Ln top of the "T"
-#lat = 32.882281
-#lon = -117.235354
-
-#Engineer Ln south end
-#lat = 32.881772
-#lon = -117.234741
-
-#EBU 1 Loading Dock stree south end
-#lat = 32.881373
-#lon =-117.235912
-
-#EBU 1 Back Patio
-latW = 32.871894
-lonW = -117.2350076
-phiW = latW*(math.pi/180)
-lamW = lonW*(math.pi/180)
-rE = 6371.008 #Earth's mean volumetric radius
-# ---- End Waypoint ----
-
-# ---- Instantiate Critical Objects ----
-vehicle_esc = VehiclePWMModule.vehiclePWM("esc")
-vehicle_servo = VehiclePWMModule.vehiclePWM("servo")
-ubl = U_blox()
-imu = MPU9250()
-log_root.warning('Connection established: %s' % imu.testConnection())
-# ---- End Instantiate Critical Objects ----
-
 # ---- Initialize esc, servo, IMU & GPS ----
-#Start with vehicle at rest
-vehicle_esc.stop()
-vehicle_esc.rest()
-#Initialize IMU & GPS
-vehicle_servo.rest()
-imu.initialize()
-GPSNavInit()
-log_root.warning('End initialize IMU & GPS')
+try:
+	#Start with vehicle at rest
+	vehicle_esc.stop()
+	vehicle_esc.rest()
+	#Initialize IMU & GPS
+	vehicle_servo.rest()
+	imu.initialize()
+	GPSNavInit()
+	log_root.warning('End initialize IMU & GPS')
 # ---- End Initialize IMU & GPS ----
 
 # ---- Calibrate IMU & Re-enable GPS Messages----
-#Begin calibrate IMU
-magMeans = calibrateMag() #Mean values are the coordinates in the center of all readings (zero in the adafruit datasheet). Y's values are most useful
-#Re-enable GPS Messages
-commUblox(CFGmsg8_NAVposllh_yes)
-#backupMsg = [0xb5, 0x62, 0x06, 0x01, 0x03, 0x00, 0x01, 0x02, 0x01, 0x0e, 0x47]
-#commUblox(backupMsg)
-log_root.warning('End calibrate IMU & Re-enable GPS messages')
+	#Begin calibrate IMU
+	magMeans = calibrateMag() #Mean values are the coordinates in the center of all readings (zero in the adafruit datasheet). Y's values are most useful
+	#Re-enable GPS Messages
+	commUblox(CFGmsg8_NAVposllh_yes)
+	#backupMsg = [0xb5, 0x62, 0x06, 0x01, 0x03, 0x00, 0x01, 0x02, 0x01, 0x0e, 0x47]
+	#commUblox(backupMsg)
+	log_root.warning('End calibrate IMU & Re-enable GPS messages')
+except:
+	log_root.warning('Abort@Calibrate')
+	log_root.warning(traceback.format_exc())
+	vehicle_esc.stop()
+	vehicle_esc.rest()
+	vehicle_servo.rest()
+	sys.exit()
 # ---- End Calibrate IMU & Re-enable GPS Messages----
 
 #Know next location
@@ -252,7 +251,7 @@ log_root.warning('End calibrate IMU & Re-enable GPS messages')
 #Set course to move towards next waypoint
 
 timeout = 0
-bearWP = 0
+bearWP = 90
 toSpeed = 0 #Stop speed
 toAngle = 0
 
@@ -352,14 +351,14 @@ try:
 		if (abs(bearRel)>8): #If not bearing in correct direction...
 			if (bearRel > 0): #If bearing is to the right of waypoint, turn LEFT
 				if (bearRel < 45):
-					vehicle_servo.steer(15)
+					vehicle_servo.steer(20)
 					#print '15'
 				else:
 					vehicle_servo.steer(35)
 					#print '35'
 			else: #If bearing is to the left of waypoint, turn RIGHT
 				if (bearRel > -45):
-					vehicle_servo.steer(-15)
+					vehicle_servo.steer(-20)
 					#print '-15'
 				else:
 					vehicle_servo.steer(-35)
@@ -371,7 +370,7 @@ try:
 			#time.sleep(0.05)
 		
 		#Always control movement
-		if (timeout < 200): #If GPS hasn't timed out...
+		if (timeout < 500): #If GPS hasn't timed out...
 			#If arrived at destination, STOP
 			'''
 			if ( (abs(pos['lat']-latW) <= 0.01) and (abs(pos['lon']-lonW) <= 0.01) ):
@@ -381,6 +380,7 @@ try:
 			else: #Not arrived at destination, GO
 				vehicle_esc.accel(1)
 			'''
+			vehicle_esc.accel(1)
 			timeout = timeout + 1 #Iterate timeout
 		else: #GPS has timed out
 			vehicle_esc.stop()
@@ -390,12 +390,13 @@ try:
 		# ------------------------------
 
 except KeyboardInterrupt:
-	log_root.warning('Abort: KeyboardInterrupt')
+	log_root.warning('Abort@while(True): KeyboardInterrupt')
 except TypeError:
-	log_root.warning('Abort: TypeError')
+	log_root.warning('Abort@while(True): TypeError')
 finally:
-	log_root.warning('Finally')
+	log_root.warning('Finally@while(True)')
 	log_root.warning(traceback.format_exc())
 	vehicle_esc.stop()
+	vehicle_esc.rest()
 	vehicle_servo.rest()
 	sys.exit()
