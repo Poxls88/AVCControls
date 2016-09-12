@@ -307,7 +307,7 @@ def updateMag()#current heading update
 		#headRad = headRadSign%math.pi #Good for debugging, but unecessary to calculate realative bearing
 		##headDeg = headDegSign%360 #Good for debugging, but unecessary to calculate realative bearing
 		log_root.info('headDegSign,%f' %headDegSign)
-		return [headDegSign]
+		return headDegSign
 	# --- End IMU Methods ---
 	# -----------------------
 # ---- End Define Methods ----
@@ -357,22 +357,49 @@ toSpeed = 0 #Stop speed
 toAngle = 0
 
 try:
-	log_root.warning('Begin try:initial GPSNavUpdate() and updateMag()')
-	#Initial read GPS to update [lat,lon,magneticBearingSigned]
-	initPos = GPSNavUpdate()
-	#Initial read Magnetometer to update [headingDegreesSigned]
-	initHead = updateMag()
-	log_root.warning('Begin try:while(True):')
+	log_root.warning('Begin try')
+	log_root.warning('flush and average initial GPSNavUpdate() and updateMag()')
+	#Flush out potentially inaccuration GPS readings
+	x = 0
+	while (True):
+		flushPos = GPSNavUpdate()
+		flushHead = updateMag()
+		if (flushPos != None):
+			x = x + 1
+		elif x == 9:
+			break
+	#Create an average to calculate inital waypoint bearing
+	x = 0
+	sumPos = 0
+	sumHead = 0
+	while (True):
+		onePos = GPSNavUpdate()
+		oneHead = updateMag()
+		if (flushPos != None):
+			sumPos[0] = sumPos[0] + onePos[0]
+			sumPos[1] = sumPos[1] + onePos[1]
+			sumPos[2] = sumPos[2] + onePos[2]
+			sumHead = sumHead + sumHead
+			x = x + 1
+		elif x == 9:
+			break
+	#Initial read GPS to receive an updated [lat,lon,magneticBearingSigned]	
+	initPos[0] = sumPos[0]/x
+	initPos[1] = sumPos[1]/x
+	initPos[2] = sumPos[2]/x
+	#Initial read Magnetometer to receive an updated headingDegreesSigned
+	initHead = sumHead/x
+	log_root.warning('Begin update while(True)')
 	while(True):
-		#Constantly read GPS to update [lat,lon,magneticBearing]
+		#Constantly read GPS to receive an updated [lat,lon,magneticBearingSigned]
 		curPos = GPSNavUpdate()
-		#Constantly read Magnetometer to update [headingDegreesSigned]
+		#Constantly read Magnetometer to receive an updated headingDegreesSigned
 		curHead = updateMag()
 		#MagneticBearing and HeadingDegreesSigned are both necessary to calculate relative bearing
 		
 		#	Note:Relative bearing is the angle between vehicle's heading and the measured magneticBearing to the waypoint
 		#Calculate InitialCurrentRelativeBearing as the angle between the current heading and the initial magneticBearing
-		circleAlign = (initPos[3] - curHead)%360 #This just rotates the cirlce so that its 0<->360 aligns with the heading at "0". Aka the waypoint is around the perspective of the vehicle.
+		circleAlign = (initPos[2] - curHead)%360 #This just rotates the cirlce so that its 0<->360 aligns with the heading at "0". Aka the waypoint is around the perspective of the vehicle.
 		if (circleMagic > 180): #Checking then subtracting by 360 gives negative sign to anything clockwise of our heading
 			initRelBearSign = circleAlign - 360 #Subtracting by 
 		else:
@@ -393,10 +420,21 @@ try:
 		'''
 		# ---- End Continuous Steering ----
 		
-		# ---- Control Speed ----
+		# ---- Waypoint Approach And Speed ----
+		#lat smallest precision = 0.000008 (accurate and consistent within 8 ft)
+		#lon smallest precision = 0.00002 (accurate and consistent within 8 ft)
+		#lat/lon combined smallest precision = 0.00002,0.00002 (reliable geofence of 10ftx10ft square)
+		#May need to adjust timeout period as precision threshold changes.
 		if (curPos != None):
-			if ( (abs(pos['lat']-latW) <= 0.000001) and (abs(pos['lon']-lonW) <= 0.000001) ):
-				#Approaching to 6 figures is ok so long as the current timeout stays and hAcc stays
+			if (abs(curPos[0]-latW) <= 0.00002):
+				latCur = True
+			else:
+				latCur = False
+			if (abs(curPos[1]-lonW) <= 0.00002):
+				lonCur = True
+			else:
+				lonCur = False
+			if ( latCur==True and lonCur==True): #If we've reached the geofenced waypoint
 				log_root.warning('Waypoint!')
 				vehicle_esc.stop()
 				vehicle_esc.rest()
@@ -404,14 +442,13 @@ try:
 			elif: #Not arrived at destination...
 				vehicle_esc.accel(1)
 			timeout = 0 #Reset GPS timeout since GPS received a usable message
-		
-		if (timeout < 150): #If GPS hasn't timed out then GO
+		elif (timeout < 150): #Otherwise check if GPS hasn't timed out, then GO
 			vehicle_esc.accel(1)
-		else: #GPS timed out then STOP
+		else: #But when GPS times out, STOP
 			vehicle_esc.stop()
 			vehicle_esc.rest()
 		timeout = timeout + 1 #Iterate timeout
-		# ---- End Control Speed ----
+		# ---- End Waypoint Approach And Speed ----
 except KeyboardInterrupt:
 	log_root.warning('Abort@while(True): KeyboardInterrupt')
 except TypeError:

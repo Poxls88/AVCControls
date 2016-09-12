@@ -21,6 +21,9 @@ DONE:
 - Also, get input from file for calibration. And write to it if I choose to manually create means
 - Also, connor makes a good point that vehicle will always arc more and more slowly to the waypoint if
   I'm constantly updating and minimizing my relative bearing. Instead, quickly adjust the steering to a more slowly updated bearing.
+- Change waypoint specificity using Josh's text and testing from night of 9/11
+- Have two for loops to grab GPS before the while(true) starts. The first is to get bad readings out
+	of the way. The second is to then create an average that will be used to calculate the intial waypoint bearing.
 
 TODO:
 - Also take a screenshot of the exact waypoint location.
