@@ -58,8 +58,9 @@ from VehicleGPSModule import *
 from navio.mpu9250_better import MPU9250
 
 navio.util.check_apm()
-
+# -------------------------
 # ----- Logging Setup -----
+# -------------------------
 #1) Loggers create log records. They are the outermost interface included in appliation code. root logger is default.
 #2) Handlers send the log records to particular desitnations.
 #3) Formatters specify the layout of the final output
@@ -81,9 +82,12 @@ log_root.addHandler(handler_console)
 
 #Example in text logging call
 #log_root.info('This is some data %f' % variable)
-# ----- End Loggin Setup -----
+# ----- End Logging Setup -----
+# -----------------------------
 
+# ------------------
 # ---- Waypoint ----
+# ------------------
 #EBU1 Loading Dock parkinglot south exit
 latW = 32.882171
 lonW = -117.235711
@@ -107,17 +111,25 @@ phiW = latW*(math.pi/180)
 lamW = lonW*(math.pi/180)
 rE = 6371.008 #Earth's mean volumetric radius
 # ---- End Waypoint ----
+# ----------------------
 
+# --------------------------------------
 # ---- Instantiate Critical Objects ----
+# --------------------------------------
 vehicle_esc = VehiclePWMModule.vehiclePWM("esc")
 vehicle_servo = VehiclePWMModule.vehiclePWM("servo")
 ubl = U_blox()
 imu = MPU9250()
 log_root.warning('Connection established: %s' % imu.testConnection())
 # ---- End Instantiate Critical Objects ----
+# ------------------------------------------
 
+# ------------------------
 # ---- Define Methods ----
+# ------------------------
+	# --------------------------
 	# --- Indication Methods ---
+	# --------------------------
 def wiggle(num, direction): #used particularly for visual calibration cues
 	for times in range(num):
 		vehicle_servo.steer(35*direction)
@@ -125,8 +137,11 @@ def wiggle(num, direction): #used particularly for visual calibration cues
 		vehicle_servo.center()
 		time.sleep(0.5)
 	# --- End Indication Methods ---
+	# ------------------------------
 
+	# -------------------
 	# --- GPS Methods ---
+	# -------------------
 #Define Ublox reset messages
 CFGmsg8_NAVposllh_no = [0xb5,0x62,0x06,0x01,0x08,0x00,0x01,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x12,0xb9]#Disable Ublox from publishing a NAVposllh	
 CFGmsg8_NAVstatus_no = [0xb5,0x62,0x06,0x01,0x08,0x00,0x01,0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x13,0xc0]#Disable Ublox from publishing a NAVstatus
@@ -161,61 +176,146 @@ def GPSNavInit():
 	vehicle_servo.steer(35)
 	time.sleep(0.5)
 	vehicle_servo.center()
+
+#magBearWPsign = 0
+def GPSNavUpdate(): #MagneticBearing and location update
+	pos = ubl.GPSfetch()
+	if (pos != None):
+		#After the GPS initialization it will take about 7000 loops of pos=ubl.GPSfetch so about 7 valid GPS (pos !=None) before data comes in consistantly
+		log_root.warning('lat,lon')
+		log_root.debug('%f,$f' %(pos[lat],pos[lon]))
+		if (pos['hAcc'] <= 10):#If GPS accurate (10 is ok)
+			#Prepare coordinate variables in order to calculate magnetic bearing to waypoint
+			lat = pos['lat']
+			lon = pos['lon']
+			phi = lat*(math.pi/180)
+			lam = lon*(math.pi/180)
+			
+			#Calculate the Approximate Distance from waypoint using an Equirectangular map model
+			'''
+			The original formula from online calculates clockwise so 0<->+180 is EAST and 0<->-180 is WEST
+			x = (lamW-lam)*math.cos((phi+phiW)/2)
+			y = (phiW-phi)
+			'''
+			#My own formula calculates counterclockwise so 0<->+180 is WEST and 0<->-180 is EAST
+			x = (lam-lamW)*math.cos((phi+phiW)/2)
+			y = (phiW-phi)
+			d = rE*math.sqrt((x*x)+(y*y)) #Only use is for debugging
+			
+			#Calculate the Forward/Magnetic Bearing from previous Equirectangular map model.
+			#Forward/Magnetic bearing is the angle from north to the waypoint with vehicle location as center.
+			#Ex: waypoint to left and we are on right, so magnetic bearing is 90
+			#Ex: waypoint to bottom right and we are on left, so magnetic bearing is 250
+			magBearWPsign = math.atan2(x,y)*(180/math.pi) #N=0<->+180 is WEST and N=0<->-180 is EAST
+			##magBearWP = bearWPsign%360 #removes the sign so counter clockwise 0<->360
+			log_root.info('magnetic bearing signed to wp,%f' %magBearWPSign)
+			#bearWP is changing by no more than 1.8 degrees even after the vehicle has moved 5 meters
+			return [lat,lon,magBearWPSign] #magBearWP is later used to calculate RelativeBearing, current or target.
+		else: #GPS not accurate. After multiple tests, i've not yet gotten a "bad accuracy" signal
+			log_root.warning('Bad accuracy!')
+			#Timeout is not reset so vehicle will either: continue moving for a few more loops then stop <-or-> continue moving when horizontal accuraccy is good
+	return None
 	# --- End GPS Methods ---
+	# -----------------------
 	
+	# -------------------
 	# --- IMU Methods ---
-def calibrateMag():
+	# -------------------
+def calibrateMag(auto=False):
 	time.sleep(4)
 	#Indicate start of calibration
 	log_root.warning('begin calibrateMag')
 	wiggle(1,1)
 	time.sleep(1) #5 seconds before calibration begins
+	if auto: #Read from file
+		log_root.warning('auto')
+		meansFile = open('waypointData/magnetometerMeans','r')
+		xMean = meansFile.readline().rstrip('\n')
+		yMean = meansFile.readline().rstrip('\n')
+		meansFile.close()
+		#Internet help http://stackoverflow.com/questions/12330522/reading-a-file-without-newlines
+		calMeans = {'x':xMean,'y':yMean}
+	else: #Standard manual calibration
+		#Capture about 600 points for the whole sweep
+		xSet = []
+		ySet = []
+		log_root.debug('xSet,ySet')
+		for x in xrange(600):
+			imu.read_mag()
+			xSet.append(imu.magnetometer_data[0])
+			ySet.append(imu.magnetometer_data[1])
+			log_root.debug('%f,%f' %(xSet[x],ySet[x]))
+			if (x == 150):
+				#Indicate staring 2/4 with 2 wiggles
+				#log_root.warning('begin 2/4 calibrateMag')
+				wiggle(2,1)
+			elif (x == 300):
+				#Indicate starting 3/4 with 3 steers
+				#log_root.warning('begin 3/4 calibrateMag')
+				wiggle(3,1)
+			elif (x == 450):
+				#Indicate starting 4/4 with 4 steers
+				#log_root.warning('begin 4/4 calibrateMag')
+				wiggle(4,1)
+			else:
+				time.sleep(0.05)
 	
-	#Capture about 1000 points for the whole sweep
-	xSet = []
-	ySet = []
-	for x in xrange(600):
+		log_root.warning('end calibrateMag')
+		#Indicate end of calibration
+		vehicle_servo.steer(35)
+		time.sleep(0.5)
+		vehicle_servo.steer(-35)
+		time.sleep(0.5)
+		vehicle_servo.center()
+		
+		#Mean values are the coordinates in the center of all readings (zero in the adafruit datasheet)
+		xMean = float(sum(xSet))/max(len(xSet),1)
+		yMean = float(sum(ySet))/max(len(ySet),1)
+		#Y holds similar values for NORTH and SOUTH
+		#X holds similar values for EAST and WEST
+		#If Y is inside a small threshold of its median the vehicle faces NORTH or SOUTH
+		#Otherwise
+		#	Y points NORTH and reads above its median, meaning the vehicle faces mostly WEST
+		#	Y points SOUTH and reads below its median, meaning the vehicle faces mostly EAST
+		meansFile = open('waypointData/magnetometerMeans','w') #Open the file for writing
+		f.write('%f\n%f\n' % (xMean,yMean))#First line is xMean, second line is yMean
+		meansFile.close()
+		calMeans = {'x':xMean,'y':yMean}
+	log_root.warning('%f,%f' %(calMeans['x'],calMeans['y']))
+	return calMeans #Returns the x,y means from manual or file calibration
+
+magMeans = {'x':0,'y':0}
+def updateMag()#current heading update
+		#Note: The magnetometer data is stored as a list ordered [x,y,z]
+		#Note: x+ is directed towards the front of the RPI2/Navio+ and y+ is directed towards the right of the RPI2/Navio+
+		#Note: all calculations assume x is the verticle axis and y is horizontal. Upsidedown vehicle reverses E<->W
 		imu.read_mag()
-		xSet.append(imu.magnetometer_data[0])
-		ySet.append(imu.magnetometer_data[1])
-		log_root.debug('%f,%f' %(xSet[x],ySet[x]))
-		if (x == 150):
-			#Indicate staring 2/4 with 2 wiggles
-			#log_root.warning('begin 2/4 calibrateMag')
-			wiggle(2,1)
-		elif (x == 300):
-			#Indicate starting 3/4 with 3 steers
-			#log_root.warning('begin 3/4 calibrateMag')
-			wiggle(3,1)
-		elif (x == 450):
-			#Indicate starting 4/4 with 4 steers
-			#log_root.warning('begin 4/4 calibrateMag')
-			wiggle(4,1)
-		else:
-			time.sleep(0.05)
-
-	log_root.warning('end calibrateMag')
-	#Indicate end of calibration
-	vehicle_servo.steer(35)
-	time.sleep(0.5)
-	vehicle_servo.steer(-35)
-	time.sleep(0.5)
-	vehicle_servo.center()
-	
-	#Mean values are the coordinates in the center of all readings (zero in the adafruit datasheet)
-	xMean = float(sum(xSet))/max(len(xSet),1)
-	yMean = float(sum(ySet))/max(len(ySet),1)
-	#Y holds similar values for NORTH and SOUTH
-	#X holds similar values for EAST and WEST
-	#If Y is inside a small threshold of its median the vehicle faces NORTH or SOUTH
-	#Otherwise
-	#	Y points NORTH and reads above its median, meaning the vehicle faces mostly WEST
-	#	Y points SOUTH and reads below its median, meaning the vehicle faces mostly EAST
-	return {'x':xMean,'y':yMean}
+		xRaw = imu.magnetometer_data[0]
+		yRaw = imu.magnetometer_data[1]
+		
+		#Translate current reading so that it lies on a circle centered on the origin
+		yCtrd = yRaw-magMeans['y']#Current readings minus the mean
+		xCtrd = xRaw-magMeans['x']
+		
+		#Calculate vehicle's current heading counterclockwise N=0<->+180(WEST) and N=0<->-180(EAST). Heading is angle between the vehicle and NORTH.
+		headNoDecRadSign = math.atan2(yCtrd,xCtrd) #atan2 in python takes (y, x). This is opposite to excel
+		headNoDecDegSign = headRadSign*(180/math.pi)
+		##log_root.info('headDegSign: %f' %headDegSign)
+		headDegSign = headNoDecDegSign + 11.7 #Adjust for declination (SD=11.7, boulder=8.2, avg = 10)
+		
+		#Convert the heading to range from 0<->360, WEST=90, EAST=270
+		#headRad = headRadSign%math.pi #Good for debugging, but unecessary to calculate realative bearing
+		##headDeg = headDegSign%360 #Good for debugging, but unecessary to calculate realative bearing
+		log_root.info('headDegSign,%f' %headDegSign)
+		return [headDegSign]
 	# --- End IMU Methods ---
+	# -----------------------
 # ---- End Define Methods ----
+# ----------------------------
 
+# ------------------------------------------
 # ---- Initialize esc, servo, IMU & GPS ----
+# ------------------------------------------
 try:
 	#Start with vehicle at rest
 	vehicle_esc.stop()
@@ -226,9 +326,12 @@ try:
 	GPSNavInit()
 	log_root.warning('End initialize IMU & GPS')
 # ---- End Initialize IMU & GPS ----
+# ----------------------------------
 
+# -----------------------------------------------
 # ---- Calibrate IMU & Re-enable GPS Messages----
-	#Begin calibrate IMU
+# -----------------------------------------------
+	#Begin calibrate IMU. Pass 'file' argument to load averages from the last calibration
 	magMeans = calibrateMag() #Mean values are the coordinates in the center of all readings (zero in the adafruit datasheet). Y's values are most useful
 	#Re-enable GPS Messages
 	commUblox(CFGmsg8_NAVposllh_yes)
@@ -241,164 +344,74 @@ except:
 	vehicle_esc.stop()
 	vehicle_esc.rest()
 	vehicle_servo.rest()
+	meansFile.close()
 	sys.exit()
 # ---- End Calibrate IMU & Re-enable GPS Messages----
+# ---------------------------------------------------
 
 #Know next location
 #calculate next waypoint heading
 #Set course to move towards next waypoint
-
 timeout = 0
-bearWP = 0
 toSpeed = 0 #Stop speed
 toAngle = 0
-a = 0
 
 try:
+	log_root.warning('Begin try:initial GPSNavUpdate() and updateMag()')
+	#Initial read GPS to update [lat,lon,magneticBearingSigned]
+	initPos = GPSNavUpdate()
+	#Initial read Magnetometer to update [headingDegreesSigned]
+	initHead = updateMag()
 	log_root.warning('Begin try:while(True):')
 	while(True):
-		# -------------------------------------
-		# ---- Read GPS To Update Location ----
-		# -------------------------------------
-
-		pos = ubl.GPSfetch()
-		if (pos != None):
-			#After the GPS initialization it will take about 7000 loops of pos=ubl.GPSfetch
-			#and about 7 (pos !=None) before GPS data comes in consistently
-			log_root.warning('pos')
-			log_root.debug(pos)
-			if (pos['hAcc'] <= 10):#If GPS accurate (change to 10 for actual testing)
-				#Prepare coordinate variables in order to calculate bearing
-				lat = pos['lat']
-				lon = pos['lon']
-				phi = lat*(math.pi/180)
-				lam = lon*(math.pi/180)
-				
-				#Calculate the Approximate Distance from waypoint using an Equirectangular map model
-				'''
-				The original formula from online calculates clockwise so 0<->+180 is EAST and 0<->-180 is WEST
-				x = (lamW-lam)*math.cos((phi+phiW)/2)
-				y = (phiW-phi)
-				'''
-				#My own formula calculates counterclockwise so 0<->+180 is WEST and 0<->-180 is EAST
-				x = (lam-lamW)*math.cos((phi+phiW)/2)
-				y = (phiW-phi)
-				d = rE*math.sqrt((x*x)+(y*y)) #Only use is for debugging
-				#print 'distance', d
-				
-				#Calculate the Forward Bearing from previous Equirectangular map model
-				bearWPsign = math.atan2(x,y)*(180/math.pi)
-				bearWP = bearWPsign%360 #removes the sign so counter clockwise 0<->360
-				log_root.info('bearing wp %f' %bearWP)
-				#bearWP is changing by no more than 1.8 degrees even after the vehicle has moved 5 meters
-				
-				#Reset GPS timeout since GPS received a usable message
-				timeout = 0
-				
-			else: #GPS not accurate. After multiple tests, i've not yet gotten a "bad accuracy" signal
-				log_root.warning('Bad accuracy!')
-				#Timeout is not reset so vehicle will either: continue moving for a few more loops then stop <-or-> continue moving when horizontal accuraccy is good
+		#Constantly read GPS to update [lat,lon,magneticBearing]
+		curPos = GPSNavUpdate()
+		#Constantly read Magnetometer to update [headingDegreesSigned]
+		curHead = updateMag()
+		#MagneticBearing and HeadingDegreesSigned are both necessary to calculate relative bearing
 		
-		# -----------------------------------------
-		# ---- End Read GPS To Update Location ----
-		# -----------------------------------------
-		
-		# -----------------------------------------------
-		# ---- Read Magnetometer To Control Steering ----
-		# -----------------------------------------------
-		#	Note: The magnetometer data is stored as a list ordered [x,y,z]
-		#	Note: x+ is directed towards the front of the RPI2/Navio+ and y+ is directed towards the right of the RPI2/Navio+
-		#	Note: all calculations assume x is the verticle axis and y is horizontal. Upsidedown vehicle reverses E<->W
-		imu.read_mag()
-		xRaw = imu.magnetometer_data[0]
-		yRaw = imu.magnetometer_data[1]
-		#print '%f,%f' % (xRaw,yRaw)
-		
-		#Translate current reading so that it lies on a circle centered on the origin
-		yCtrd = yRaw-magMeans['y']#Current readings minus the mean
-		xCtrd = xRaw-magMeans['x']
-		
-		#Calculate the heading counterclockwise 0<->+90(WEST) then -90<->0 (EAST). Heading is angle between the vehicle and NORTH.
-		headNoDecRadSign = math.atan2(yCtrd,xCtrd) #atan2 in python takes (y, x). This is opposite to excel
-		headNoDecDegSign = headRadSign*(180/math.pi)
-		##log_root.info('headDegSign: %f' %headDegSign)
-		headDegSign = headNoDecDegSign + 11.7 #Adjust for declination (SD=11.7, boulder=8.2, avg = 10)
-		
-		'''
-		#Convert the heading to range from 0<->360, WEST=90, EAST=270
-		headRad = headRadSign%math.pi #Good for debugging, but unecessary to calculate heading
-		headDeg = headDegSign%360 #Good for debugging, but unecessary to calculate heading
-		#print 'Radians heading from north: %f' % (headRad)
-		#print 'Degrees heading from North: %f' %(headDeg)
-		'''
-		#Calculate the relative bearing counterclockwise.
-		#Relative bearing is the angle between vehicle's heading and target. Magnetic bearing is the angle between the vehicle, target, and north.
-		bearBasic = (bearWP-headDegSign)%360 #The bearing is reoriented so that the waypoint is around the perspective of the vehicle. (vehicle direction "becomes the 0 degree")
-		#bearRel = (target-headDeg)%360. Has more roundoff error
-		#bearRel = (headDeg-target)%360. Use target as the reference "0" degree and reorients the vehicle around the target's perspective.
-		##log_root.info('bearBasic: %f' %bearBasic)
-
-		#Prepare relative bearing. Keep under <180 and include a sign to denote direction.
-		if (bearBasic>180):
-			bearRel=bearBasic-360 #Subtracting by 360 adds sign
+		#	Note:Relative bearing is the angle between vehicle's heading and the measured magneticBearing to the waypoint
+		#Calculate InitialCurrentRelativeBearing as the angle between the current heading and the initial magneticBearing
+		circleAlign = (initPos[3] - curHead)%360 #This just rotates the cirlce so that its 0<->360 aligns with the heading at "0". Aka the waypoint is around the perspective of the vehicle.
+		if (circleMagic > 180): #Checking then subtracting by 360 gives negative sign to anything clockwise of our heading
+			initRelBearSign = circleAlign - 360 #Subtracting by 
 		else:
-			bearRel=bearBasic
-		log_root.warning('bearRel: %f' %bearRel)
-		# ---------------------------------------------------
-		# ---- End Read Magnetometer To Control Steering ----
-		# ---------------------------------------------------
+			initRelBearSign = circleAlign
+		log_root.warning('initRelBearSign, %f' %initRelBearSign)
 		
-		# --------------------------
-		# ---- Control Movement ----
-		# --------------------------
-		#Always continue steering
-		if (abs(bearRel)>8): #If not bearing in correct direction...
-			if (bearRel > 0): #If bearing is to the right of waypoint, turn LEFT
-				'''
-				if (bearRel < 45):
-					vehicle_servo.steer(20)
-					#print '15'
-				else:
-					vehicle_servo.steer(35)
-					#print '35'
-				'''
+		# ---- Continuous Steering ----
+		vehicle_servo.steer(initRelBearSign*35/180)#steer(+-35) is largest value and initRelBearSign is signed
+		'''
+		if (abs(relBear)>8): #If not bearing in correct direction. Gets rid of noise.
+			if (relBear >0): #If waypoint is counterclockwise of heading, turn LEFT
 				vehicle_servo.steer(35)
-			else: #If bearing is to the left of waypoint, turn RIGHT
-				'''if (bearRel > -45):
-					vehicle_servo.steer(-20)
-					#print '-15'
-				else:
-					vehicle_servo.steer(-35)
-					#print '-35'
-				'''
+			else: #If waypoint is clockwise of heading, turn RIGHT
 				vehicle_servo.steer(-35)
-			#Convert bearing angle to possible steering angle
-			#vehicle_servo.steer(bearRel*35/180) #steer(+-35) is largest value and bearRel is signed
 		else:#If bearing in correct direction, CENTERED
 			vehicle_servo.center()
 			#time.sleep(0.05)
+		'''
+		# ---- End Continuous Steering ----
 		
-		#Always control movement
-		if (timeout < 150): #If GPS hasn't timed out...
-			#If arrived at destination, STOP
-			if (pos != None):
-				print pos['lat']
-				if ( (abs(pos['lat']-latW) <= 0.000001) and (abs(pos['lon']-lonW) <= 0.000001) ):
-					#Approaching to 6 figures is ok so long as the current timeout stays and hAcc stays
-					log_root.warning('Waypoint!')
-					vehicle_esc.stop()
-					vehicle_esc.rest()
-					raise KeyboardInterrupt
-				else: #Not arrived at destination, GO
-					vehicle_esc.accel(1)
-			timeout = timeout + 1 #Iterate timeout
-		else: #GPS has timed out
+		# ---- Control Speed ----
+		if (curPos != None):
+			if ( (abs(pos['lat']-latW) <= 0.000001) and (abs(pos['lon']-lonW) <= 0.000001) ):
+				#Approaching to 6 figures is ok so long as the current timeout stays and hAcc stays
+				log_root.warning('Waypoint!')
+				vehicle_esc.stop()
+				vehicle_esc.rest()
+				raise KeyboardInterrupt
+			elif: #Not arrived at destination...
+				vehicle_esc.accel(1)
+			timeout = 0 #Reset GPS timeout since GPS received a usable message
+		
+		if (timeout < 150): #If GPS hasn't timed out then GO
+			vehicle_esc.accel(1)
+		else: #GPS timed out then STOP
 			vehicle_esc.stop()
 			vehicle_esc.rest()
-		# ------------------------------
-		# ---- End Control Movement ----
-		# ------------------------------
-
+		timeout = timeout + 1 #Iterate timeout
+		# ---- End Control Speed ----
 except KeyboardInterrupt:
 	log_root.warning('Abort@while(True): KeyboardInterrupt')
 except TypeError:

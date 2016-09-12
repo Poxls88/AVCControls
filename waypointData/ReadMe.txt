@@ -16,5 +16,12 @@ Maybe its declination?
 Boulder's declination is 8.2 degrees more to the east than true north.
 San Diego's declination is 11.7 degrees more to the east than true north.
 
-Next time i test, make sure to better separate GPS output data. Also take a screenshot of the exact waypoint location.
-Also, good idea to have gps and compass be separate processes.
+DONE:
+- I've better formated GPS output data
+- Also, get input from file for calibration. And write to it if I choose to manually create means
+- Also, connor makes a good point that vehicle will always arc more and more slowly to the waypoint if
+  I'm constantly updating and minimizing my relative bearing. Instead, quickly adjust the steering to a more slowly updated bearing.
+
+TODO:
+- Also take a screenshot of the exact waypoint location.
+- Also, good idea to have gps and compass be separate processes.
