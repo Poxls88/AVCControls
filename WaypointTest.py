@@ -210,7 +210,7 @@ def GPSNavUpdate(): #MagneticBearing and location update
 			##magBearWP = bearWPsign%360 #removes the sign so counter clockwise 0<->360
 			log_root.info('magnetic bearing signed to wp,%f' %magBearWPSign)
 			#bearWP is changing by no more than 1.8 degrees even after the vehicle has moved 5 meters
-			return [lat,lon,magBearWPSign] #magBearWP is later used to calculate RelativeBearing, current or target.
+			return [lat,lon,magBearWPSign,d] #magBearWP is later used to calculate RelativeBearing, current or target.
 		else: #GPS not accurate. After multiple tests, i've not yet gotten a "bad accuracy" signal
 			log_root.warning('Bad accuracy!')
 			#Timeout is not reset so vehicle will either: continue moving for a few more loops then stop <-or-> continue moving when horizontal accuraccy is good
@@ -372,7 +372,7 @@ try:
 			break
 	#Create an average to calculate inital waypoint bearing
 	x = 0
-	sumPos = [0,0,0]
+	sumPos = [0,0,0,0]
 	sumHead = 0
 	while (True):
 		onePos = GPSNavUpdate()
@@ -381,18 +381,23 @@ try:
 			sumPos[0] = sumPos[0] + onePos[0]
 			sumPos[1] = sumPos[1] + onePos[1]
 			sumPos[2] = sumPos[2] + onePos[2]
+			sumPos[3] = sumPos[3] + onePos[3]
 			sumHead = sumHead + sumHead
 			x = x + 1
 		if x == 5:
 			break
-	#Initial read GPS to receive an updated [lat,lon,magneticBearingSigned]
-	initPos = [0,0,0]
+	#Initial read GPS to receive an updated [lat,lon,magneticBearingSigned,distance]
+	initPos = [0,0,0,0]
 	initPos[0] = sumPos[0]/x
 	initPos[1] = sumPos[1]/x
 	initPos[2] = sumPos[2]/x
+	initPos[3] = sumPos[3]/x
 	#Initial read Magnetometer to receive an updated headingDegreesSigned
 	initHead = sumHead/x
 	log_root.warning('Begin update while(True)')
+	
+	init targetTime = 0
+	steerAngle = 0
 	while(True):
 		#Constantly read GPS to receive an updated [lat,lon,magneticBearingSigned]
 		curPos = GPSNavUpdate()
@@ -410,7 +415,32 @@ try:
 		log_root.info('initRelBearSign, %f' %initRelBearSign)
 		
 		# ---- Continuous Steering ----
-		vehicle_servo.steer(initRelBearSign*35/180)#steer(+-35) is largest value and initRelBearSign is signed
+		
+		lastAngle = steerAngle
+
+		if (abs(initRelBearSign) > 8):
+			if (initRelBearSign > 0): #If waypoint is counterclockwise then turn LEFT
+				steerMax = 35
+			else: #waypoint is clockwise turn RIGHT
+				steerMax = -35
+			steerAngle = initRelBearSign*35/180
+		else:
+			steerAngle = 0
+
+		deltaSteer = abs(steerAngle) - abs(lastAngle)
+		if (deltaSteer < 0): #Then lastAngle is bigger and we want to steer smaller
+			compSteer = 0
+		else:
+			compSteer = steerMax
+		
+		if (time.time() < targetTime):
+			vehicle_servo.steer(compSteer)
+			#angleLast = compSteer
+		else:
+			vehicle_servo.steer(steerAngle)
+			targetTime = time.time()+0.5
+			
+		#vehicle_servo.steer(initRelBearSign*35/180)#steer(+-35) is largest value and initRelBearSign is signed
 		'''
 		if (abs(relBear)>8): #If not bearing in correct direction. Gets rid of noise.
 			if (relBear >0): #If waypoint is counterclockwise of heading, turn LEFT
@@ -429,6 +459,21 @@ try:
 		#lat/lon combined smallest precision = 0.00002,0.00002 (reliable geofence of 10ftx10ft square)
 		#May need to adjust timeout period as precision threshold changes.
 		if (curPos != None):
+			if (curPos[3] <= .005):
+				log_root.warning('Waypoint!')
+				vehicle_esc.stop()
+				vehicle_esc.rest()
+				raise KeyboardInterrupt
+			else: #Not arrived at destination...
+				vehicle_esc.accel(1)
+			timeout = 0 #Reset GPS timeout since GPS received a usable message
+		elif (timeout < 150): #Otherwise check if GPS hasn't timed out, then GO
+			vehicle_esc.accel(1)
+		else: #But when GPS times out, STOP
+			vehicle_esc.stop()
+			vehicle_esc.rest()
+		timeout = timeout + 1 #Iterate timeout
+		'''
 			if (abs(curPos[0]-latW) <= 0.00007): #0.00002
 				latCur = True
 			else:
@@ -451,6 +496,7 @@ try:
 			vehicle_esc.stop()
 			vehicle_esc.rest()
 		timeout = timeout + 1 #Iterate timeout
+		'''
 		# ---- End Waypoint Approach And Speed ----
 except KeyboardInterrupt:
 	log_root.warning('Abort@while(True): KeyboardInterrupt')

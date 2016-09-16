@@ -24,6 +24,7 @@ DONE:
 - Change waypoint specificity using Josh's text and testing from night of 9/11
 - Have two for loops to grab GPS before the while(true) starts. The first is to get bad readings out
 	of the way. The second is to then create an average that will be used to calculate the intial waypoint bearing.
+- Do the math to make the waypoint trigger within 3 meters
 
 TODO:
 - Also take a screenshot of the exact waypoint location.
